@@ -2,14 +2,14 @@
 set -e
 
 # Heidi CLI One-Click Installer for Linux/macOS
-# Ensures pipx exists and installs Heidi CLI from GitHub
+# Clones repo and installs in editable mode with venv
 
-echo "🚀 Heidi CLI Installer"
-echo "======================"
+echo "Heidi CLI Installer"
+echo "===================="
 
 # Check if Python is available
 if ! command -v python3 &> /dev/null && ! command -v python &> /dev/null; then
-    echo "❌ Python is not installed. Please install Python 3.8+ first."
+    echo "Python is not installed. Please install Python 3.10+ first."
     exit 1
 fi
 
@@ -21,26 +21,46 @@ elif command -v python &> /dev/null; then
     PYTHON_CMD="python"
 fi
 
-echo "✅ Found Python: $PYTHON_CMD"
+echo "Found Python: $PYTHON_CMD"
 
-# Install pipx if not available
-if ! command -v pipx &> /dev/null; then
-    echo "📦 Installing pipx..."
-    $PYTHON_CMD -m pip install --user pipx
-    $PYTHON_CMD -m pipx ensurepath
-    echo "✅ pipx installed"
-else
-    echo "✅ pipx already installed"
+# Check Python version
+PYTHON_VERSION=$($PYTHON_CMD -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
+REQUIRED_VERSION="3.10"
+
+if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$PYTHON_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]; then
+    echo "Python $PYTHON_VERSION is too old. Please install Python 3.10 or later."
+    exit 1
 fi
 
-# Install Heidi CLI from GitHub
-echo "📦 Installing Heidi CLI..."
-pipx install git+https://github.com/heidi-dang/heidi-cli.git
+echo "Python version: $PYTHON_VERSION"
+
+# Create temp directory
+TEMP_DIR=$(mktemp -d)
+cd "$TEMP_DIR"
+
+# Clone repo
+echo "Cloning heidi-cli..."
+git clone https://github.com/heidi-dang/heidi-cli.git
+cd heidi-cli/heidi_cli
+
+# Create virtual environment
+echo "Creating virtual environment..."
+$PYTHON_CMD -m venv .venv
+source .venv/bin/activate
+
+# Upgrade pip
+echo "Installing dependencies..."
+pip install --upgrade pip -q
+
+# Install in editable mode
+pip install -e ".[dev]" -q
 
 echo ""
-echo "🎉 Heidi CLI installed successfully!"
+echo "Heidi CLI installed successfully!"
 echo ""
-echo "Next steps:"
-echo "Run: heidi"
+echo "To activate the virtual environment, run:"
+echo "  source .venv/bin/activate"
 echo ""
-echo "For help, run: heidi --help"
+echo "Then run:"
+echo "  heidi init"
+echo "  heidi --help"
