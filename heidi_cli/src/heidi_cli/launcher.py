@@ -17,6 +17,23 @@ from rich.progress import SpinnerColumn, TextColumn, Progress
 console = Console()
 
 
+def find_repo_root(start_path: Optional[Path] = None) -> Optional[Path]:
+    """Find the repo root by walking up for .git or pyproject.toml."""
+    if start_path is None:
+        start_path = Path.cwd()
+
+    current = start_path.resolve()
+    while current != current.parent:
+        if (current / ".git").exists() or (current / "pyproject.toml").exists():
+            return current
+        current = current.parent
+
+    if (current / ".git").exists() or (current / "pyproject.toml").exists():
+        return current
+
+    return None
+
+
 def get_heidi_dir() -> Path:
     """Get the .heidi directory path."""
     return Path.cwd() / ".heidi"
@@ -169,6 +186,7 @@ def start_backend(
 def start_ui_dev_server(
     port: int = 3002,
     api_url: str = "http://localhost:7777",
+    ui_dir: Optional[Path] = None,
 ) -> Optional[subprocess.Popen]:
     """
     Start the UI dev server via npm run dev.
@@ -182,9 +200,17 @@ def start_ui_dev_server(
 
     console.print(f"[cyan]Starting UI dev server on 127.0.0.1:{port}...[/cyan]")
 
-    ui_path = Path.cwd() / "ui"
+    if ui_dir:
+        ui_path = ui_dir
+    else:
+        repo_root = find_repo_root()
+        if not repo_root:
+            console.print("[red]Could not find repo root (no .git or pyproject.toml found)[/red]")
+            return None
+        ui_path = repo_root / "ui"
+
     if not ui_path.exists():
-        console.print("[red]UI folder not found at ./ui[/red]")
+        console.print(f"[red]UI folder not found at {ui_path}[/red]")
         return None
 
     env = os.environ.copy()

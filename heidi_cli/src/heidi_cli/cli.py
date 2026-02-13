@@ -832,9 +832,13 @@ def ui_cmd(
     ui: bool = typer.Option(True, "--ui/--no-ui", help="Start UI dev server"),
     port: int = typer.Option(7777, "--port", help="Backend port"),
     ui_port: int = typer.Option(3002, "--ui-port", help="UI dev server port"),
+    ui_dir: Optional[str] = typer.Option(
+        None, "--ui-dir", help="UI directory path (auto-detects repo root if not set)"
+    ),
     open_browser: bool = typer.Option(True, "--open/--no-open", help="Open browser automatically"),
 ) -> None:
     """Start Heidi UI (shorthand for 'heidi start ui')."""
+    from pathlib import Path
     from .launcher import (
         start_backend,
         start_ui_dev_server,
@@ -850,6 +854,7 @@ def ui_cmd(
     import os
 
     os.environ["HEIDI_NO_WIZARD"] = "1"
+    ui_dir_path = Path(ui_dir) if ui_dir else None
 
     backend_process = None
     ui_process = None
@@ -871,7 +876,7 @@ def ui_cmd(
             if is_ui_running(ui_port):
                 console.print(f"[yellow]UI already running on http://127.0.0.1:{ui_port}[/yellow]")
             else:
-                ui_process = start_ui_dev_server(port=ui_port, api_url=api_base)
+                ui_process = start_ui_dev_server(port=ui_port, api_url=api_base, ui_dir=ui_dir_path)
 
         api_url_final = f"http://127.0.0.1:{actual_port}"
         ui_url = f"http://127.0.0.1:{ui_port}"
@@ -980,6 +985,9 @@ def start_ui(
     ui: bool = typer.Option(True, "--ui/--no-ui", help="Start UI dev server"),
     port: int = typer.Option(7777, "--port", help="Backend port"),
     ui_port: int = typer.Option(3002, "--ui-port", help="UI dev server port"),
+    ui_dir: Optional[str] = typer.Option(
+        None, "--ui-dir", help="UI directory path (auto-detects repo root if not set)"
+    ),
     open_browser: bool = typer.Option(True, "--open/--no-open", help="Open browser automatically"),
     tunnel: bool = typer.Option(False, "--tunnel", help="Start Cloudflare tunnel"),
     api_url: str = typer.Option(
@@ -987,6 +995,10 @@ def start_ui(
     ),
 ) -> None:
     """Start Heidi backend and UI dev server."""
+    from pathlib import Path
+
+    ui_dir_path = Path(ui_dir) if ui_dir else None
+
     import webbrowser
     from .launcher import (
         start_backend,
@@ -1022,7 +1034,7 @@ def start_ui(
             if is_ui_running(ui_port):
                 console.print(f"[yellow]UI already running on http://127.0.0.1:{ui_port}[/yellow]")
             else:
-                ui_process = start_ui_dev_server(port=ui_port, api_url=api_base)
+                ui_process = start_ui_dev_server(port=ui_port, api_url=api_base, ui_dir=ui_dir_path)
 
         api_url_final = f"http://127.0.0.1:{actual_port}"
         ui_url = f"http://127.0.0.1:{ui_port}"
