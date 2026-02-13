@@ -5,14 +5,10 @@ author: Heidi
 version: 2.0.0
 """
 
-import json
 import requests
-import queue
-import threading
-import time
 import traceback
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Union, Generator, Iterator
+from typing import List, Union, Generator, Iterator
 
 
 class Pipe:
@@ -87,14 +83,14 @@ class Pipe:
             result = data.get("result", "")
             error = data.get("error", "")
 
-            output = f"### 🔄 Agent Loop Started\n"
+            output = "### 🔄 Agent Loop Started\n"
             output += f"**Task:** {task}\n"
             output += f"**Executor:** {self.valves.DEFAULT_EXECUTOR}\n"
             output += f"**Run ID:** {run_id}\n\n"
 
             if status == "completed":
                 output += f"**Result:** {result}\n"
-                output += f"\n[View full logs: `heidi runs`]\n"
+                output += "\n[View full logs: `heidi runs`]\n"
             else:
                 output += f"**Status:** {status}\n"
                 if error:
@@ -125,7 +121,7 @@ class Pipe:
             result = data.get("result", "")
             error = data.get("error", "")
 
-            output = f"### ▶️ Run Started\n"
+            output = "### ▶️ Run Started\n"
             output += f"**Prompt:** {prompt[:100]}...\n"
             output += f"**Executor:** {self.valves.DEFAULT_EXECUTOR}\n"
             output += f"**Run ID:** {run_id}\n\n"
