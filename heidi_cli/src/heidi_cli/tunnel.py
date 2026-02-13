@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import re
 import shutil
-import signal
 import subprocess
-import sys
 from typing import Optional, Tuple
 
 from rich.console import Console
