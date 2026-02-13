@@ -845,7 +845,9 @@ def ui_cmd(
     port: int = typer.Option(7777, "--port", help="Backend port"),
     ui_port: int = typer.Option(3002, "--ui-port", help="UI dev server port"),
     ui_dir: Optional[str] = typer.Option(
-        None, "--ui-dir", help="UI directory path (auto-detects repo root if not set)"
+        None,
+        "--ui-dir",
+        help="UI directory (clone: git clone https://github.com/heidi-dang/Heidi-cli-ui ui)",
     ),
     open_browser: bool = typer.Option(True, "--open/--no-open", help="Open browser automatically"),
 ) -> None:
@@ -998,7 +1000,9 @@ def start_ui(
     port: int = typer.Option(7777, "--port", help="Backend port"),
     ui_port: int = typer.Option(3002, "--ui-port", help="UI dev server port"),
     ui_dir: Optional[str] = typer.Option(
-        None, "--ui-dir", help="UI directory path (auto-detects repo root if not set)"
+        None,
+        "--ui-dir",
+        help="UI directory (clone: git clone https://github.com/heidi-dang/Heidi-cli-ui ui)",
     ),
     open_browser: bool = typer.Option(True, "--open/--no-open", help="Open browser automatically"),
     tunnel: bool = typer.Option(False, "--tunnel", help="Start Cloudflare tunnel"),

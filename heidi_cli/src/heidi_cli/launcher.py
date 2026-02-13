@@ -224,11 +224,24 @@ def start_ui_dev_server(
         repo_root = find_repo_root()
         if not repo_root:
             console.print("[red]Could not find repo root (no .git or pyproject.toml found)[/red]")
+            console.print("[dim]Use --ui-dir to specify UI location[/dim]")
             return None
         ui_path = repo_root / "ui"
 
     if not ui_path.exists():
-        console.print(f"[red]UI folder not found at {ui_path}[/red]")
+        console.print(f"[yellow]UI folder not found at {ui_path}[/yellow]")
+        if not ui_dir:
+            console.print(
+                "[dim]Option 1: Clone UI with: git clone https://github.com/heidi-dang/Heidi-cli-ui ui[/dim]"
+            )
+            console.print("[dim]Option 2: Use --ui-dir to specify UI location[/dim]")
+        return None
+
+    if not (ui_path / "package.json").exists():
+        console.print(
+            f"[yellow]UI folder exists but missing package.json at {ui_path / 'package.json'}[/yellow]"
+        )
+        console.print("[dim]Run: git clone https://github.com/heidi-dang/Heidi-cli-ui ui[/dim]")
         return None
 
     env = os.environ.copy()
