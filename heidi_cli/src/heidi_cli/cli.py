@@ -4,6 +4,8 @@ import asyncio
 import json
 import os
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Optional
 
@@ -48,6 +50,18 @@ def get_version() -> str:
 def print_json(data: Any) -> None:
     if json_output:
         print(json.dumps(data, indent=2))
+
+
+def open_url(url: str) -> None:
+    """Open URL in browser - WSL compatible."""
+    if sys.platform == "win32":
+        subprocess.run(["powershell.exe", "-Command", f"Start-Process '{url}'"], check=False)
+    elif shutil.which("wslview"):
+        subprocess.run(["wslview", url], check=False)
+    else:
+        import webbrowser
+
+        webbrowser.open(url)
 
 
 @app.callback()
@@ -789,7 +803,7 @@ def ui_cmd(
     backend: bool = typer.Option(True, "--backend/--no-backend", help="Start backend server"),
     ui: bool = typer.Option(True, "--ui/--no-ui", help="Start UI dev server"),
     port: int = typer.Option(7777, "--port", help="Backend port"),
-    ui_port: int = typer.Option(3001, "--ui-port", help="UI dev server port"),
+    ui_port: int = typer.Option(3002, "--ui-port", help="UI dev server port"),
     open_browser: bool = typer.Option(True, "--open/--no-open", help="Open browser automatically"),
 ) -> None:
     """Start Heidi UI (shorthand for 'heidi start ui')."""
@@ -843,7 +857,7 @@ def ui_cmd(
 
         if open_browser and ui:
             console.print("[cyan]Opening browser...[/cyan]")
-            webbrowser.open(ui_url)
+            open_url(ui_url)
 
         console.print("\n[cyan]Press Ctrl+C to stop[/cyan]")
 
@@ -937,7 +951,7 @@ def start_ui(
     backend: bool = typer.Option(True, "--backend/--no-backend", help="Start backend server"),
     ui: bool = typer.Option(True, "--ui/--no-ui", help="Start UI dev server"),
     port: int = typer.Option(7777, "--port", help="Backend port"),
-    ui_port: int = typer.Option(3001, "--ui-port", help="UI dev server port"),
+    ui_port: int = typer.Option(3002, "--ui-port", help="UI dev server port"),
     open_browser: bool = typer.Option(True, "--open/--no-open", help="Open browser automatically"),
     tunnel: bool = typer.Option(False, "--tunnel", help="Start Cloudflare tunnel"),
     api_url: str = typer.Option(
@@ -994,7 +1008,7 @@ def start_ui(
 
         if open_browser and ui:
             console.print("[cyan]Opening browser...[/cyan]")
-            webbrowser.open(ui_url)
+            open_url(ui_url)
 
         if not tunnel:
             tunnel = typer.confirm(
@@ -1017,7 +1031,7 @@ def start_ui(
                     )
                     if open_browser:
                         public_ui_url = f"{public_url}/?baseUrl={public_url}"
-                        webbrowser.open(public_ui_url)
+                        open_url(public_ui_url)
 
         console.print("\n[cyan]Press Ctrl+C to stop[/cyan]")
 
@@ -1067,7 +1081,7 @@ def start_backend_cmd(
     console.print(f"[green]Backend running at http://{host}:{actual_port}[/green]")
 
     if open_browser:
-        webbrowser.open(f"http://{host}:{actual_port}/ui/")
+        open_url(f"http://{host}:{actual_port}/ui/")
 
 
 @start_app.command("services")

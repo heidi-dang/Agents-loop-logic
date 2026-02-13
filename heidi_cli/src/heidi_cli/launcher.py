@@ -69,14 +69,14 @@ def wait_for_server(host: str, port: int, timeout: int = 15) -> bool:
     """Wait for server to be ready by polling /health endpoint."""
     start_time = time.time()
     url = f"http://{host}:{port}/health"
-    
+
     while time.time() - start_time < timeout:
         try:
             urllib.request.urlopen(url, timeout=2)
             return True
         except (urllib.error.URLError, socket.timeout, ConnectionRefusedError):
             time.sleep(0.5)
-    
+
     return False
 
 
@@ -91,14 +91,16 @@ def check_port_available(host: str, port: int) -> bool:
         return False
 
 
-def find_available_port(host: str, start_port: int = 7777) -> int:
+def find_available_port(host: str, start_port: int = 7777, max_port: int = None) -> int:
     """Find an available port starting from start_port."""
+    if max_port is None:
+        max_port = start_port + 100
     port = start_port
-    while port < start_port + 100:
+    while port < max_port:
         if check_port_available(host, port):
             return port
         port += 1
-    raise RuntimeError(f"Could not find available port near {start_port}")
+    raise RuntimeError(f"Could not find available port between {start_port}-{max_port}")
 
 
 def start_backend(
@@ -109,28 +111,33 @@ def start_backend(
 ) -> Tuple[Optional[subprocess.Popen], int]:
     """
     Start the Heidi backend server.
-    
+
     Returns (process, actual_port) tuple.
     """
     actual_port = port
     if not check_port_available(host, port):
         console.print(f"[yellow]Port {port} not available, finding available port...[/yellow]")
         actual_port = find_available_port(host, port)
-    
+
     console.print(f"[cyan]Starting backend on {host}:{actual_port}...[/cyan]")
-    
+
     env = os.environ.copy()
     env["HEIDI_NO_WIZARD"] = "1"
-    
+
     cmd = [
-        sys.executable, "-m", "heidi_cli", "serve",
-        "--host", host,
-        "--port", str(actual_port),
+        sys.executable,
+        "-m",
+        "heidi_cli",
+        "serve",
+        "--host",
+        host,
+        "--port",
+        str(actual_port),
     ]
-    
+
     log_file = get_logs_dir() / "backend.log"
     log_fd = open(log_file, "w")
-    
+
     process = subprocess.Popen(
         cmd,
         env=env,
@@ -138,9 +145,9 @@ def start_backend(
         stderr=subprocess.STDOUT,
         start_new_session=True,
     )
-    
+
     add_pid("backend", process.pid)
-    
+
     if wait:
         with Progress(
             SpinnerColumn(),
@@ -155,37 +162,38 @@ def start_backend(
                 console.print(f"[red]Backend failed to start within {timeout}s[/red]")
                 process.terminate()
                 raise RuntimeError("Backend failed to start")
-    
+
     return process, actual_port
 
 
 def start_ui_dev_server(
-    port: int = 3000,
+    port: int = 3002,
     api_url: str = "http://localhost:7777",
 ) -> Optional[subprocess.Popen]:
     """
     Start the UI dev server via npm run dev.
-    
+
     Returns the process.
     """
     if not check_port_available("127.0.0.1", port):
-        console.print(f"[yellow]Port {port} not available, finding available port...[/yellow]")
-        port = find_available_port("127.0.0.1", port)
-    
+        console.print(f"[yellow]Port {port} not available, scanning ports 3002-3010...[/yellow]")
+        port = find_available_port("127.0.0.1", 3002, 3010)
+        console.print(f"[green]Using port {port}[/green]")
+
     console.print(f"[cyan]Starting UI dev server on 127.0.0.1:{port}...[/cyan]")
-    
+
     ui_path = Path.cwd() / "ui"
     if not ui_path.exists():
         console.print("[red]UI folder not found at ./ui[/red]")
         return None
-    
+
     env = os.environ.copy()
     env["API_URL"] = api_url
     env["PORT"] = str(port)
-    
+
     log_file = get_logs_dir() / "ui.log"
     log_fd = open(log_file, "w")
-    
+
     process = subprocess.Popen(
         ["npm", "run", "dev", "--", "--port", str(port), "--host", "127.0.0.1"],
         cwd=str(ui_path),
@@ -194,11 +202,11 @@ def start_ui_dev_server(
         stderr=subprocess.STDOUT,
         start_new_session=True,
     )
-    
+
     add_pid("ui", process.pid)
-    
+
     console.print(f"[green]UI dev server started on http://127.0.0.1:{port}[/green]")
-    
+
     return process
 
 
@@ -252,16 +260,22 @@ def is_backend_running(host: str = "127.0.0.1", port: int = 7777) -> bool:
         return False
 
 
-def is_ui_running(port: int = 3000) -> bool:
-    """Check if UI dev server is running."""
-    return not check_port_available("127.0.0.1", port)
+def is_ui_running(port: int = 3002) -> bool:
+    """Check if UI dev server is running by checking health endpoint."""
+    import httpx
+
+    try:
+        response = httpx.get(f"http://127.0.0.1:{port}", timeout=2)
+        return response.status_code == 200
+    except Exception:
+        return False
 
 
 def get_status() -> Dict[str, dict]:
     """Get status of all managed services."""
     status = {}
     pids = load_pids()
-    
+
     backend_running = is_backend_running()
     if "backend" in pids:
         try:
@@ -274,7 +288,7 @@ def get_status() -> Dict[str, dict]:
         except OSError:
             status["backend"] = {"pid": pids["backend"], "running": False, "port": 7777}
             remove_pid("backend")
-    
+
     if "ui" in pids:
         try:
             os.kill(pids["ui"], 0)
@@ -286,5 +300,5 @@ def get_status() -> Dict[str, dict]:
         except OSError:
             status["ui"] = {"pid": pids["ui"], "running": False, "port": 3000}
             remove_pid("ui")
-    
+
     return status
