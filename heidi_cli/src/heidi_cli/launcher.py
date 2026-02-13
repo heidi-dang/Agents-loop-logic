@@ -18,17 +18,25 @@ console = Console()
 
 
 def find_repo_root(start_path: Optional[Path] = None) -> Optional[Path]:
-    """Find the repo root by walking up for .git or pyproject.toml."""
+    """Find the repo root by walking up for .git + heidi_cli or pyproject.toml."""
     if start_path is None:
         start_path = Path.cwd()
 
     current = start_path.resolve()
     while current != current.parent:
-        if (current / ".git").exists() or (current / "pyproject.toml").exists():
+        has_git = (current / ".git").exists()
+        has_pyproject = (current / "pyproject.toml").exists()
+        has_heidi = (current / "heidi_cli").exists() or (current / "ui").exists()
+
+        if (has_git and has_heidi) or has_pyproject:
             return current
         current = current.parent
 
-    if (current / ".git").exists() or (current / "pyproject.toml").exists():
+    has_git = (current / ".git").exists()
+    has_pyproject = (current / "pyproject.toml").exists()
+    has_heidi = (current / "heidi_cli").exists() or (current / "ui").exists()
+
+    if (has_git and has_heidi) or has_pyproject:
         return current
 
     return None

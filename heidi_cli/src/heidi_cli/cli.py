@@ -53,11 +53,17 @@ def print_json(data: Any) -> None:
 
 
 def open_url(url: str) -> None:
-    """Open URL in browser - WSL compatible."""
+    """Open URL in browser - WSL/Linux/Windows compatible."""
     if sys.platform == "win32":
         subprocess.run(["powershell.exe", "-Command", f"Start-Process '{url}'"], check=False)
     elif shutil.which("wslview"):
         subprocess.run(["wslview", url], check=False)
+    elif shutil.which("xdg-open"):
+        subprocess.run(["xdg-open", url], check=False)
+    elif shutil.which("gnome-open"):
+        subprocess.run(["gnome-open", url], check=False)
+    elif shutil.which("gio"):
+        subprocess.run(["gio", "open", url], check=False)
     else:
         import webbrowser
 
