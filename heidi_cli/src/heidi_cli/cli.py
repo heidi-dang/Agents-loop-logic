@@ -365,6 +365,7 @@ def loop(
     dry_run: bool = typer.Option(False, "--dry-run", help="Generate plan but don't apply changes"),
     context: Optional[Path] = typer.Option(None, "--context", help="Path to inject into context (e.g., ./docs)"),
     persona: str = typer.Option("default", help="Persona to use (default, security, docs, refactor)"),
+    no_live: bool = typer.Option(False, "--no-live", help="Disable streaming UI"),
 ) -> None:
     """Run: Plan -> execute handoffs -> audit -> PASS/FAIL (starter loop)."""
     config = ConfigManager.load_config()
