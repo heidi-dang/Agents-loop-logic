@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import Any, Optional
@@ -674,6 +675,59 @@ def backups_cmd(
 
 
 @app.command("serve")
+def serve(
+    host: str = typer.Option("0.0.0.0", help="Host to bind to"),
+    port: int = typer.Option(7777, help="Port to bind to"),
+    ui: bool = typer.Option(False, "--ui", help="Also start UI dev server"),
+) -> None:
+    """Start Heidi CLI server."""
+    import subprocess
+    import threading
+    
+    def start_backend():
+        from .server import start_server
+        start_server(host=host, port=port)
+    
+    console.print(f"[cyan]Starting Heidi backend on {host}:{port}...[/cyan]")
+    backend_thread = threading.Thread(target=start_backend, daemon=True)
+    backend_thread.start()
+    
+    if ui:
+        ui_path = Path.cwd() / "ui"
+        if not ui_path.exists():
+            console.print("[red]UI not found at ./ui - run from heidi-cli root[/red]")
+            raise typer.Exit(1)
+        
+        console.print("[cyan]Starting UI dev server on http://localhost:3000...[/cyan]")
+        
+        def start_ui():
+            subprocess.run(
+                ["npm", "run", "dev", "--", "--port", "3000"],
+                cwd=ui_path,
+                env={**os.environ, "API_URL": f"http://{host}:{port}"},
+            )
+        
+        ui_thread = threading.Thread(target=start_ui, daemon=True)
+        ui_thread.start()
+        
+        console.print(Panel.fit(
+            "[green]Heidi is running!\n\n"
+            "Backend: http://localhost:7777\n"
+            "UI: http://localhost:3000\n\n"
+            "Press Ctrl+C to stop",
+            title="Heidi CLI"
+        ))
+    else:
+        console.print(Panel.fit(
+            f"[green]Heidi server running at http://{host}:{port}[/green]\n\n"
+            "Press Ctrl+C to stop",
+            title="Heidi CLI Server"
+        ))
+    
+    try:
+        backend_thread.join()
+    except KeyboardInterrupt:
+        console.print("[yellow]Stopping Heidi...[/yellow]")
 
 
 @app.command("review")
@@ -731,14 +785,6 @@ Provide:
     except Exception as e:
         console.print(f"[red]Review failed: {e}[/red]")
         raise typer.Exit(1)
-def serve(
-    host: str = typer.Option("0.0.0.0", help="Host to bind to"),
-    port: int = typer.Option(7777, help="Port to bind to"),
-) -> None:
-    """Start Heidi CLI HTTP server for OpenWebUI integration."""
-    from .server import start_server
-    console.print(f"[green]Starting Heidi server on {host}:{port}[/green]")
-    start_server(host=host, port=port)
 
 
 if __name__ == "__main__":

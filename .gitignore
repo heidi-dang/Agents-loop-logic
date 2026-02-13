@@ -56,3 +56,8 @@ heidi-cli-*.zip
 
 # Reviews output
 reviews/
+
+# UI build
+ui/node_modules/
+ui/dist/
+ui/.vite/

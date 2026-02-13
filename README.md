@@ -157,6 +157,54 @@ The server provides these endpoints for OpenWebUI:
 - `POST /run` - Execute single prompt
 - `POST /loop` - Execute full agent loop
 
+## Product Test Flow
+
+### Local Demo (Terminal + UI)
+
+**Terminal A - Start Backend and UI:**
+```bash
+# From heidi-cli root
+cd ui && npm install
+
+# Start both backend + UI (from heidi-cli root)
+heidi serve --ui
+
+# Or start separately:
+# Terminal A1: heidi serve
+# Terminal A2: cd ui && npm run dev -- --port 3000
+```
+
+**Browser:**
+```
+http://localhost:3000
+```
+
+**Test Checklist:**
+- [ ] Health check works (UI shows connected)
+- [ ] Run mode → POST /run executes
+- [ ] Loop mode → POST /loop executes
+- [ ] Streaming shows live updates (or polling fallback works)
+- [ ] Run list shows recent runs via /runs?limit=10
+
+### Tunneling (Production)
+
+Before exposing via Cloudflared:
+
+1. **Enable API Key Auth:**
+```bash
+export HEIDI_API_KEY=your-secret-key
+heidi serve
+```
+
+2. **Configure CORS (if needed):**
+```bash
+export HEIDI_CORS_ORIGINS=http://localhost:3000,https://your-tunnel-url
+```
+
+3. **UI calls must include:**
+   - Header: `X-Heidi-Key: your-secret-key`
+   - For SSE streaming: `/runs/{id}/stream?key=your-secret-key`
+
 ## Development
 
 ```bash
