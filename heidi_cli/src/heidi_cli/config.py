@@ -21,7 +21,8 @@ class HeidiConfig(BaseModel):
     default_agent: str = "high-autonomy"
     provider: str = "copilot"
     telemetry_enabled: bool = False
-    openwebui_url: Optional[str] = None
+    openwebui_url: Optional[str] = "http://localhost:3000"
+    openwebui_token: Optional[str] = None
     ollama_url: str = "http://localhost:11434"
     lmstudio_url: str = "http://localhost:1234"
     persona: str = "default"
