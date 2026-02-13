@@ -523,6 +523,50 @@ def status_cmd() -> None:
         console.print("[dim]No runs yet. Run 'heidi loop' to get started.[/dim]")
 
 
+@app.command("restore")
+def restore_cmd(
+    path: Path = typer.Argument(..., help="File path to restore"),
+    run_id: Optional[str] = typer.Option(None, help="Specific run ID to restore from"),
+    latest: bool = typer.Option(True, help="Restore latest backup (vs earliest)"),
+) -> None:
+    """Restore a file from backup."""
+    from .backup import restore_file
+    
+    if not path.exists() and run_id is None:
+        console.print(f"[red]File '{path}' not found. Provide run_id to restore deleted file.[/red]")
+        raise typer.Exit(1)
+    
+    success = restore_file(path, run_id, latest)
+    if success:
+        console.print(f"[green]Restored {path.name} from backup[/green]")
+    else:
+        console.print(f"[red]No backup found for {path.name}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command("backups")
+def backups_cmd(
+    run_id: Optional[str] = typer.Option(None, help="Filter by run ID"),
+) -> None:
+    """List available backups."""
+    from .backup import list_backups
+    
+    backups = list_backups(run_id)
+    if not backups:
+        console.print("[yellow]No backups found[/yellow]")
+        return
+    
+    table = Table(title="Backups")
+    table.add_column("File", style="cyan")
+    table.add_column("Path", style="white")
+    table.add_column("Size", style="white")
+    
+    for b in backups[:20]:
+        table.add_row(b["name"], b["path"], f"{b['size']} bytes")
+    
+    console.print(table)
+
+
 @app.command("serve")
 def serve(
     host: str = typer.Option("0.0.0.0", help="Host to bind to"),
