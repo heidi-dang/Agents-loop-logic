@@ -2,23 +2,66 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import uvicorn
 
+# Optional API key protection:
+# - If HEIDI_API_KEY is set, protected endpoints require:
+#     X-Heidi-Key: <key>
+# - Streaming via EventSource can't send custom headers, so /stream also accepts:
+#     ?key=<key>   (MVP tradeoff; can be replaced with fetch() streaming in UI later)
+HEIDI_API_KEY = os.getenv("HEIDI_API_KEY", "").strip()
+
+# CORS allowlist:
+# - If HEIDI_CORS_ORIGINS is set (comma-separated), it overrides everything.
+# - Otherwise:
+#     - If auth enabled -> default to localhost UI
+#     - If auth disabled -> allow all (current behavior for local dev)
+_cors_env = os.getenv("HEIDI_CORS_ORIGINS", "").strip()
+if _cors_env:
+    ALLOW_ORIGINS = [o.strip() for o in _cors_env.split(",") if o.strip()]
+else:
+    ALLOW_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"] if HEIDI_API_KEY else ["*"]
 
 app = FastAPI(title="Heidi CLI Server")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOW_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _require_api_key(request: Request, stream_key: Optional[str] = None) -> None:
+    """
+    Enforce API key if HEIDI_API_KEY is set.
+    - Normal requests use X-Heidi-Key header
+    - Stream endpoint may pass stream_key from query param ?key=...
+    """
+    if not HEIDI_API_KEY:
+        return
+    header_key = request.headers.get("x-heidi-key", "")
+    effective = (header_key or stream_key or "").strip()
+    if not effective or effective != HEIDI_API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+def _no_store_headers() -> dict:
+    # Reduce proxy buffering/caching risks for SSE
+    return {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+    }
 
 
 class RunRequest(BaseModel):
@@ -60,7 +103,9 @@ async def health():
 
 
 @app.get("/runs")
-async def list_runs(limit: int = 10):
+async def list_runs(limit: int = 10, request: Request = None):
+    if request is not None:
+        _require_api_key(request)
     from .config import ConfigManager
 
     runs_dir = ConfigManager.runs_dir()
@@ -83,7 +128,8 @@ async def list_runs(limit: int = 10):
 
 
 @app.get("/runs/{run_id}")
-async def get_run(run_id: str):
+async def get_run(run_id: str, request: Request):
+    _require_api_key(request)
     from .config import ConfigManager
 
     run_dir = ConfigManager.runs_dir() / run_id
@@ -109,7 +155,8 @@ async def get_run(run_id: str):
 
 
 @app.get("/runs/{run_id}/stream")
-async def stream_run(run_id: str):
+async def stream_run(run_id: str, request: Request, key: Optional[str] = None):
+    _require_api_key(request, stream_key=key)
     from .config import ConfigManager
 
     run_dir = ConfigManager.runs_dir() / run_id
@@ -132,11 +179,16 @@ async def stream_run(run_id: str):
                     if line:
                         yield f"data: {line}\n\n"
 
-    return event_generator()
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers=_no_store_headers(),
+    )
 
 
 @app.post("/run", response_model=RunResponse)
-async def run(request: RunRequest):
+async def run(request: RunRequest, http_request: Request):
+    _require_api_key(http_request)
     from .logging import HeidiLogger
     from .orchestrator.loop import pick_executor
 
@@ -163,7 +215,8 @@ async def run(request: RunRequest):
 
 
 @app.post("/loop", response_model=RunResponse)
-async def loop(request: LoopRequest):
+async def loop(request: LoopRequest, http_request: Request):
+    _require_api_key(http_request)
     from .logging import HeidiLogger
     from .orchestrator.loop import run_loop
 
