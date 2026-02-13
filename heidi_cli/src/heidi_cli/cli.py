@@ -24,6 +24,7 @@ auth_app = typer.Typer(help="Authentication commands")
 agents_app = typer.Typer(help="Agent management")
 valves_app = typer.Typer(help="Configuration valves")
 persona_app = typer.Typer(help="Persona management")
+start_app = typer.Typer(help="Start services")
 
 app.add_typer(copilot_app, name="copilot")
 app.add_typer(auth_app, name="auth")
@@ -31,6 +32,7 @@ app.add_typer(agents_app, name="agents")
 app.add_typer(valves_app, name="valves")
 app.add_typer(openwebui_app, name="openwebui")
 app.add_typer(persona_app, name="persona")
+app.add_typer(start_app, name="start")
 
 console = Console()
 json_output = False
@@ -785,6 +787,107 @@ Provide:
     except Exception as e:
         console.print(f"[red]Review failed: {e}[/red]")
         raise typer.Exit(1)
+
+
+@start_app.command("ui")
+def start_ui(
+    host: str = typer.Option("127.0.0.1", "--host", help="Host to bind to"),
+    port: int = typer.Option(7777, "--port", help="Port to bind to"),
+    open_browser: bool = typer.Option(True, "--open/--no-open", help="Open browser automatically"),
+    tunnel: bool = typer.Option(False, "--tunnel", help="Start Cloudflare tunnel"),
+    tunnel_url: str = typer.Option("http://localhost:7777", "--tunnel-url", help="Local URL for tunnel"),
+) -> None:
+    """Start the Heidi server and UI."""
+    import webbrowser
+    from .launcher import start_server, stop_server, is_server_running
+    from .tunnel import start_tunnel, stop_tunnel, is_cloudflared_installed, get_tunnel_instructions
+    from rich.panel import Panel
+    import signal
+    import sys
+
+    server_process = None
+    tunnel_process = None
+    actual_port = port
+
+    try:
+        # Check if server already running
+        if is_server_running(host, port):
+            console.print(f"[yellow]Server already running on http://{host}:{port}[/yellow]")
+            actual_port = port
+        else:
+            # Start server
+            server_process, actual_port = start_server(host=host, port=port, wait=True, timeout=15)
+        
+        ui_url = f"http://{host}:{actual_port}/ui"
+        api_url = f"http://{host}:{actual_port}"
+        
+        console.print(Panel.fit(
+            f"[green]UI:[/green] {ui_url}\n"
+            f"[green]API:[/green] {api_url}",
+            title="Heidi Server"
+        ))
+        
+        # Open browser
+        if open_browser:
+            console.print(f"[cyan]Opening browser...[/cyan]")
+            webbrowser.open(ui_url)
+        
+        # Ask about tunnel
+        if not tunnel:
+            tunnel = typer.confirm(
+                "Expose publicly via Cloudflare Tunnel (cloudflared)?",
+                default=False,
+            )
+        
+        if tunnel:
+            if not is_cloudflared_installed():
+                console.print(get_tunnel_instructions())
+            else:
+                tunnel_process, public_url = start_tunnel(tunnel_url)
+                if public_url:
+                    console.print(Panel.fit(
+                        f"[green]Public URL:[/green] {public_url}",
+                        title="Cloudflare Tunnel"
+                    ))
+                    if open_browser:
+                        webbrowser.open(public_url)
+        
+        console.print("\n[cyan]Press Ctrl+C to stop[/cyan]")
+        
+        # Wait for interrupt
+        def signal_handler(sig, frame):
+            console.print("\n[yellow]Shutting down...[/yellow]")
+            sys.exit(0)
+        
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+        
+        # Keep running
+        import time
+        while True:
+            time.sleep(1)
+    
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Shutting down...[/yellow]")
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
+    finally:
+        if tunnel_process:
+            stop_tunnel(tunnel_process)
+        if server_process:
+            stop_server(server_process)
+        console.print("[green]Stopped.[/green]")
+
+
+@start_app.command("server")
+def start_server_cmd(
+    host: str = typer.Option("127.0.0.1", "--host", help="Host to bind to"),
+    port: int = typer.Option(7777, "--port", help="Port to bind to"),
+) -> None:
+    """Start the Heidi API server only (without UI)."""
+    from .server import start_server
+    start_server(host=host, port=port)
 
 
 if __name__ == "__main__":

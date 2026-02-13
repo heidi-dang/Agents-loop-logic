@@ -8,7 +8,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel
 import uvicorn
 
@@ -32,6 +32,9 @@ else:
 
 app = FastAPI(title="Heidi CLI Server")
 
+# UI distribution directory - can be overridden for development
+UI_DIST = Path(__file__).parent / "ui_dist"
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOW_ORIGINS,
@@ -41,52 +44,46 @@ app.add_middleware(
 )
 
 
-def _require_api_key(request: Request, stream_key: Optional[str] = None) -> None:
-    """
-    Enforce API key if HEIDI_API_KEY is set.
-    - Normal requests use X-Heidi-Key header
-    - Stream endpoint may pass stream_key from query param ?key=...
-    """
-    if not HEIDI_API_KEY:
-        return
-    header_key = request.headers.get("x-heidi-key", "")
-    effective = (header_key or stream_key or "").strip()
-    if not effective or effective != HEIDI_API_KEY:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-
-def _no_store_headers() -> dict:
-    # Reduce proxy buffering/caching risks for SSE
-    return {
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-        "X-Accel-Buffering": "no",
-    }
-
-
-class RunRequest(BaseModel):
-    prompt: str
-    executor: str = "copilot"
-    workdir: Optional[str] = None
-
-
-class LoopRequest(BaseModel):
-    task: str
-    executor: str = "copilot"
-    max_retries: int = 2
-    workdir: Optional[str] = None
-
-
-class RunResponse(BaseModel):
-    run_id: str
-    status: str
-    result: Optional[str] = None
-    error: Optional[str] = None
-
-
 @app.get("/")
 async def root():
-    return {"status": "ok", "service": "heidi-cli"}
+    """Redirect root to /ui/ for the UI"""
+    if UI_DIST.exists():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/ui/")
+    return {"status": "ok", "service": "heidi-cli", "ui": "visit /ui for the web interface"}
+
+
+@app.get("/ui")
+async def ui_index():
+    """Redirect /ui to /ui/ for proper SPA routing"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/ui/")
+
+
+@app.get("/ui/{path:path}")
+async def serve_ui(path: str):
+    """Serve UI static files from ui_dist"""
+    if not UI_DIST.exists():
+        return HTMLResponse(
+            "<html><body><h1>UI Not Built</h1><p>Run <code>heidi ui build</code> to build the UI.</p></body></html>",
+            status_code=200,
+        )
+    
+    from fastapi.staticfiles import StaticFiles
+    # Let StaticFiles handle the file serving
+    file_path = UI_DIST / path
+    if file_path.is_file():
+        return StaticFiles(directory=str(UI_DIST)).get_path(path)
+    
+    # For SPA, serve index.html for non-file paths
+    index_path = UI_DIST / "index.html"
+    if index_path.exists():
+        return HTMLResponse(index_path.read_text())
+    
+    return HTMLResponse(
+        "<html><body><h1>404</h1><p>File not found</p></body></html>",
+        status_code=404,
+    )
 
 
 @app.get("/agents")
