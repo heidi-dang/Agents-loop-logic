@@ -29,6 +29,11 @@ Heidi-CLI provides a flexible system for running AI-powered agent workflows with
 - Persistent workspace state
 - Secret redaction for security
 
+## Storage
+
+- **State** (`~/.heidi/`) - Config, secrets, auth, valves
+- **Artifacts** (`./tasks/`) - Task files (`<slug>.md`), audit files (`<slug>.audit.md`) - tracked in repo
+
 ## Project Structure
 
 ```

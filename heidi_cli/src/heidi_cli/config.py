@@ -44,13 +44,12 @@ class ConfigManager:
     CONFIG_FILE = HEIDI_DIR / "config.json"
     SECRETS_FILE = HEIDI_DIR / "secrets.json"
     RUNS_DIR = HEIDI_DIR / "runs"
-    TASKS_DIR = HEIDI_DIR / "tasks"
+    TASKS_DIR = Path("./tasks")
 
     @classmethod
     def ensure_dirs(cls) -> None:
         cls.HEIDI_DIR.mkdir(parents=True, exist_ok=True)
         cls.RUNS_DIR.mkdir(parents=True, exist_ok=True)
-        cls.TASKS_DIR.mkdir(parents=True, exist_ok=True)
 
     @classmethod
     def load_config(cls) -> HeidiConfig:

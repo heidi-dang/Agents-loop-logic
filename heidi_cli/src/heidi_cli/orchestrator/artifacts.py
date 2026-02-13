@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from ..config import ConfigManager
-from ..logging import HeidiLogger
+from ..logging import HeidiLogger, redact_secrets
 
 
 @dataclass
@@ -22,12 +22,14 @@ class TaskArtifact:
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
     def save(self) -> Path:
-        task_dir = ConfigManager.TASKS_DIR / self.slug
-        task_dir.mkdir(parents=True, exist_ok=True)
+        tasks_dir = ConfigManager.TASKS_DIR
+        tasks_dir.mkdir(parents=True, exist_ok=True)
 
-        (task_dir / "task.md").write_text(self.content)
-        (task_dir / "audit.md").write_text(self.audit_content)
-        (task_dir / "progress.md").write_text(self.progress_content)
+        task_file = tasks_dir / f"{self.slug}.md"
+        audit_file = tasks_dir / f"{self.slug}.audit.md"
+
+        task_file.write_text(redact_secrets(self.content))
+        audit_file.write_text(redact_secrets(self.audit_content))
 
         meta = {
             "slug": self.slug,
@@ -35,26 +37,31 @@ class TaskArtifact:
             "created_at": self.created_at,
             "updated_at": datetime.utcnow().isoformat(),
         }
-        (task_dir / "meta.json").write_text(json.dumps(meta, indent=2))
+        (tasks_dir / f"{self.slug}.meta.json").write_text(json.dumps(meta, indent=2))
 
-        return task_dir
+        return tasks_dir
 
     @classmethod
     def load(cls, slug: str) -> Optional[TaskArtifact]:
-        task_dir = ConfigManager.TASKS_DIR / slug
-        if not task_dir.exists():
+        tasks_dir = ConfigManager.TASKS_DIR
+        if not tasks_dir.exists():
             return None
 
-        meta = json.loads((task_dir / "meta.json").read_text())
-        content = (task_dir / "task.md").read_text() if (task_dir / "task.md").exists() else ""
-        audit = (task_dir / "audit.md").read_text() if (task_dir / "audit.md").exists() else ""
-        progress = (task_dir / "progress.md").read_text() if (task_dir / "progress.md").exists() else ""
+        meta_file = tasks_dir / f"{slug}.meta.json"
+        if not meta_file.exists():
+            return None
+
+        meta = json.loads(meta_file.read_text())
+        task_file = tasks_dir / f"{slug}.md"
+        audit_file = tasks_dir / f"{slug}.audit.md"
+
+        content = task_file.read_text() if task_file.exists() else ""
+        audit = audit_file.read_text() if audit_file.exists() else ""
 
         return cls(
             slug=slug,
             content=content,
             audit_content=audit,
-            progress_content=progress,
             status=meta.get("status", "pending"),
             created_at=meta.get("created_at", ""),
             updated_at=meta.get("updated_at", ""),
@@ -93,10 +100,10 @@ def update_task_audit(slug: str, audit_result: str, passed: bool) -> None:
 
 
 def save_audit_to_task(slug: str, decision) -> None:
-    """Save audit decision to the same task directory."""
-    task_dir = ConfigManager.TASKS_DIR / slug
-    task_dir.mkdir(parents=True, exist_ok=True)
-    
+    """Save audit decision to the task audit file."""
+    tasks_dir = ConfigManager.TASKS_DIR
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+
     content = f"""# Audit: {slug}
 
 ## Decision
@@ -115,4 +122,5 @@ Why: {decision.why}
 ## Timestamp
 {datetime.utcnow().isoformat()}
 """
-    (task_dir / "audit.md").write_text(content)
+    audit_file = tasks_dir / f"{slug}.audit.md"
+    audit_file.write_text(redact_secrets(content))
