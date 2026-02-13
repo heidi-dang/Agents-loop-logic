@@ -843,7 +843,7 @@ def start_ui(
         ))
         
         if open_browser and ui:
-            console.print(f"[cyan]Opening browser...[/cyan]")
+            console.print("[cyan]Opening browser...[/cyan]")
             webbrowser.open(ui_url)
         
         if not tunnel:
