@@ -79,7 +79,7 @@ jobs:
       - name: Check forbidden paths exist locally
         run: |
           echo "Checking for forbidden paths in working tree..."
-          FORBIDDEN=".venv venv __pycache__ .pytest_cache .ruff_cache .mypy_cache .git"
+          FORBIDDEN=".venv venv __pycache__ .pytest_cache .ruff_cache .mypy_cache"
           for path in $FORBIDDEN; do
             if [ -e "$path" ]; then
               echo "ERROR: Forbidden path found: $path"
