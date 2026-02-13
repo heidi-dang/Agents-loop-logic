@@ -56,24 +56,32 @@ def open_url(url: str) -> None:
     """Open URL in browser - WSL/Linux/Windows compatible."""
     if sys.platform == "win32":
         subprocess.run(["powershell.exe", "-Command", f"Start-Process '{url}'"], check=False)
+        return
     elif shutil.which("wslview"):
         subprocess.run(["wslview", url], check=False)
+        return
     elif shutil.which("sensible-browser"):
         subprocess.run(["sensible-browser", url], check=False)
+        return
     elif shutil.which("xdg-open"):
         subprocess.run(["xdg-open", url], check=False)
+        return
     elif shutil.which("gnome-open"):
         subprocess.run(["gnome-open", url], check=False)
+        return
     elif shutil.which("gio"):
         result = subprocess.run(["gio", "open", url], check=False)
-        if result.returncode != 0:
-            import webbrowser
+        if result.returncode == 0:
+            return
 
-            webbrowser.open(url)
-    else:
+    # Try webbrowser as last resort
+    try:
         import webbrowser
 
         webbrowser.open(url)
+    except Exception:
+        console.print(f"[yellow]Could not open browser automatically.[/yellow]")
+        console.print(f"[cyan]Open manually: {url}[/cyan]")
 
 
 @app.callback()
