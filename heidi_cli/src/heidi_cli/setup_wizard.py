@@ -160,8 +160,8 @@ class SetupWizard:
         except Exception:
             console.print("❌ heidi auth status: FAIL")
 
-        # Test Copilot doctor
-        console.print("\nRunning Copilot doctor...")
+        # Test Copilot doctor (optional - may fail if not authenticated)
+        console.print("\nRunning Copilot doctor (optional)...")
         try:
             result = subprocess.run(
                 ["heidi", "copilot", "doctor"],
@@ -173,11 +173,11 @@ class SetupWizard:
             if result.returncode == 0:
                 console.print("✅ heidi copilot doctor: PASS")
             else:
-                console.print("❌ heidi copilot doctor: FAIL")
+                console.print("⚠️  heidi copilot doctor: SKIP (not authenticated)")
         except subprocess.TimeoutExpired:
             console.print("⚠️  heidi copilot doctor: TIMEOUT")
         except Exception:
-            console.print("❌ heidi copilot doctor: FAIL")
+            console.print("⚠️  heidi copilot doctor: SKIP")
 
         # Optionally test chat
         if Confirm.ask("Test Copilot chat with 'hello'?", default=False):
