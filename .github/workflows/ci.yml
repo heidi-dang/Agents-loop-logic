@@ -115,10 +115,10 @@ jobs:
           heidi --help
       - name: Initialize heidi
         run: |
-          heidi init --force
+          HEIDI_NO_WIZARD=1 heidi init --force
       - name: Check auth status
         run: |
-          output=$(heidi auth status 2>&1 || true)
+          HEIDI_NO_WIZARD=1 output=$(heidi auth status 2>&1 || true)
           echo "$output"
           if echo "$output" | grep -E "(ghp_|github_pat_|GITHUB_TOKEN=|GH_TOKEN=)" > /dev/null; then
             echo "ERROR: Token printed in auth status!"
@@ -127,4 +127,4 @@ jobs:
           echo "OK: No token printed"
       - name: Run doctor
         run: |
-          heidi doctor
+          HEIDI_NO_WIZARD=1 heidi doctor
