@@ -232,8 +232,17 @@ def doctor() -> None:
 def auth_gh(
     token: Optional[str] = typer.Option(None, help="GitHub token (or prompt if not provided)"),
     store_keyring: bool = typer.Option(True, help="Store in OS keyring"),
+    device: bool = typer.Option(False, "--device", help="Use device flow authentication"),
 ) -> None:
     """Authenticate with GitHub for Copilot access."""
+    if device:
+        from .auth_device import login_with_device_flow
+
+        access_token = login_with_device_flow()
+        if not access_token:
+            raise typer.Exit(1)
+        token = access_token
+
     if not token:
         token = typer.prompt("Enter GitHub token (with copilot scope)", hide_input=True)
 
@@ -277,8 +286,27 @@ def copilot_doctor() -> None:
                 st = await rt.client.get_status()
                 table.add_row("CLI State", "connected")
                 table.add_row("CLI Version", str(getattr(st, "cliVersion", "unknown")))
-            except Exception:
-                table.add_row("CLI State", "error")
+            except Exception as e:
+                error_msg = str(e).lower()
+                if (
+                    "unauthorized" in error_msg
+                    or "permission" in error_msg
+                    or "copilot" in error_msg
+                ):
+                    table.add_row("CLI State", "[yellow]needs token[/yellow]")
+                    console.print(
+                        "\n[yellow]Copilot requires a GitHub token with Copilot permissions.[/yellow]"
+                    )
+                    console.print("[dim]Options:[/dim]")
+                    console.print("1. Run: [cyan]heidi auth gh --device[/cyan] for device flow")
+                    console.print("2. Or create a fine-grained PAT:")
+                    console.print(
+                        "   - Go to: https://github.com/settings/tokens/new?scopes=copilot"
+                    )
+                    console.print("   - Select 'copilot' permission")
+                    console.print("   - Paste the token when prompted")
+                else:
+                    table.add_row("CLI State", "error")
 
             try:
                 auth = await rt.client.get_auth_status()
