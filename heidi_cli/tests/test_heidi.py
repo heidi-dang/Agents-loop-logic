@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 from heidi_cli.orchestrator.plan import extract_routing, parse_routing
 from heidi_cli.logging import redact_secrets
-from heidi_cli.orchestrator.workspace import WorkspaceManager, PatchApplicator, VerificationRunner
+from heidi_cli.orchestrator.workspace import PatchApplicator
 
 
 class TestPlan:
@@ -97,3 +97,53 @@ class TestWorkspace:
     def test_patch_applier_safe_diff(self):
         safe = "def hello():\n    return 'world'"
         assert PatchApplicator.is_safe_diff(safe)
+
+
+class TestArtifacts:
+    def test_tasks_dir_is_repo_root(self):
+        from heidi_cli.config import ConfigManager
+        tasks_dir = ConfigManager.TASKS_DIR
+        assert tasks_dir == Path("./tasks")
+
+    def test_heidi_dir_is_project_local(self):
+        import os
+        from heidi_cli.config import ConfigManager
+        original_cwd = os.getcwd()
+        try:
+            os.chdir("/tmp")
+            heidi_dir = ConfigManager.heidi_dir()
+            assert str(heidi_dir).startswith("/tmp")
+        finally:
+            os.chdir(original_cwd)
+
+    def test_artifact_redaction_on_save(self, tmp_path):
+        import os
+        from heidi_cli.orchestrator.artifacts import TaskArtifact
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(tmp_path)
+            (tmp_path / "tasks").mkdir()
+
+            artifact = TaskArtifact(
+                slug="test-task",
+                content="Token: ghp_abcdefghijklmnopqrstuvwxyz1234567890\nHello world",
+                audit_content="COPILOT_TOKEN=sk-test123\nAudit result: pass"
+            )
+            artifact.save()
+
+            task_file = tmp_path / "tasks" / "test-task.md"
+            audit_file = tmp_path / "tasks" / "test-task.audit.md"
+
+            assert task_file.exists()
+            assert audit_file.exists()
+
+            task_content = task_file.read_text()
+            audit_content = audit_file.read_text()
+
+            assert "ghp_" not in task_content
+            assert "***REDACTED***" in task_content
+            assert "sk-test123" not in audit_content
+            assert "***REDACTED***" in audit_content
+        finally:
+            os.chdir(original_cwd)

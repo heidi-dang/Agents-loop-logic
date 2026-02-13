@@ -344,7 +344,7 @@ END_AUDIT_DECISION
         
         # Escalate to Plan for retry
         retry_count += 1
-        if retry_count > max_retries:
+        if retry_count >= max_retries:
             artifact.status = "failed"
             artifact.content += f"\n## FATAL ERROR\nExceeded max retries ({max_retries}). Execution stuck."
             artifact.save()

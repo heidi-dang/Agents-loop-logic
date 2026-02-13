@@ -63,7 +63,7 @@ async def health():
 async def list_runs(limit: int = 10):
     from .config import ConfigManager
 
-    runs_dir = ConfigManager.RUNS_DIR
+    runs_dir = ConfigManager.runs_dir()
     if not runs_dir.exists():
         return []
 
@@ -86,7 +86,7 @@ async def list_runs(limit: int = 10):
 async def get_run(run_id: str):
     from .config import ConfigManager
 
-    run_dir = ConfigManager.RUNS_DIR / run_id
+    run_dir = ConfigManager.runs_dir() / run_id
     if not run_dir.exists():
         raise HTTPException(status_code=404, detail="Run not found")
 
@@ -112,7 +112,7 @@ async def get_run(run_id: str):
 async def stream_run(run_id: str):
     from .config import ConfigManager
 
-    run_dir = ConfigManager.RUNS_DIR / run_id
+    run_dir = ConfigManager.runs_dir() / run_id
     if not run_dir.exists():
         raise HTTPException(status_code=404, detail="Run not found")
 

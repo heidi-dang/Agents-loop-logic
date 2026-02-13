@@ -65,16 +65,16 @@ def init(
     """Initialize Heidi CLI configuration directory."""
     ConfigManager.ensure_dirs()
 
-    if ConfigManager.CONFIG_FILE.exists() and not force:
+    if ConfigManager.config_file().exists() and not force:
         console.print("[yellow]Heidi already initialized. Use --force to reinitialize.[/yellow]")
         return
 
     config = ConfigManager.load_config()
     ConfigManager.save_config(config)
-    console.print(f"[green]Initialized Heidi at {ConfigManager.HEIDI_DIR}[/green]")
-    console.print(f"  Config: {ConfigManager.CONFIG_FILE}")
-    console.print(f"  Secrets: {ConfigManager.SECRETS_FILE}")
-    console.print(f"  Runs: {ConfigManager.RUNS_DIR}")
+    console.print(f"[green]Initialized Heidi at {ConfigManager.heidi_dir()}[/green]")
+    console.print(f"  Config: {ConfigManager.config_file()}")
+    console.print(f"  Secrets: {ConfigManager.secrets_file()}")
+    console.print(f"  Runs: {ConfigManager.runs_dir()}")
     console.print(f"  Tasks: {ConfigManager.TASKS_DIR}")
 
 
@@ -414,7 +414,7 @@ def runs_list(
     limit: int = typer.Option(10, help="Number of runs to show"),
 ) -> None:
     """List recent runs."""
-    runs_dir = ConfigManager.RUNS_DIR
+    runs_dir = ConfigManager.runs_dir()
     if not runs_dir.exists():
         console.print("[yellow]No runs found[/yellow]")
         return

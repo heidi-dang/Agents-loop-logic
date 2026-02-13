@@ -44,7 +44,7 @@ class HeidiLogger:
     @classmethod
     def init_run(cls, run_id: Optional[str] = None) -> str:
         cls._run_id = run_id or str(uuid.uuid4())[:8]
-        cls._run_dir = ConfigManager.RUNS_DIR / cls._run_id
+        cls._run_dir = ConfigManager.runs_dir() / cls._run_id
         cls._run_dir.mkdir(parents=True, exist_ok=True)
 
         cls._logger = logging.getLogger(f"heidi.{cls._run_id}")
@@ -122,8 +122,9 @@ class HeidiLogger:
     def write_run_meta(cls, metadata: dict[str, Any]) -> None:
         if not cls._run_dir:
             return
+        redacted_meta = {k: redact_secrets(str(v)) for k, v in metadata.items()}
         run_file = cls._run_dir / "run.json"
-        run_file.write_text(json.dumps(metadata, indent=2))
+        run_file.write_text(json.dumps(redacted_meta, indent=2))
 
 
 def setup_global_logging(level: str = "INFO") -> None:

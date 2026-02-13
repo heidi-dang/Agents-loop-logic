@@ -31,7 +31,7 @@ Heidi-CLI provides a flexible system for running AI-powered agent workflows with
 
 ## Storage
 
-- **State** (`~/.heidi/`) - Config, secrets, auth, valves
+- **State** (`.heidi/`) - Config, secrets, auth, valves (project-local, not tracked)
 - **Artifacts** (`./tasks/`) - Task files (`<slug>.md`), audit files (`<slug>.audit.md`) - tracked in repo
 
 ## Project Structure
@@ -54,14 +54,8 @@ Heidi-CLI provides a flexible system for running AI-powered agent workflows with
 ### Installation
 
 ```bash
-# Install CLI
-cd heidi_cli
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
-
-# Configure GitHub Copilot
-heidi config set copilot-token <your-token>
+# Install CLI from repo root
+python -m pip install -e '.[dev]'
 ```
 
 ### Quick Start
@@ -101,11 +95,14 @@ heidi loop "fix failing tests" --executor copilot
 ## Development
 
 ```bash
+# Install
+python -m pip install -e '.[dev]'
+
 # Run tests
-pytest heidi_cli/tests/ -v
+pytest -q
 
 # Lint code
-ruff check heidi_cli/src/
+ruff check src
 ```
 
 ## License

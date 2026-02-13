@@ -18,6 +18,7 @@ class HeidiConfig(BaseModel):
     max_retries: int = 3
     copilot_model: str = "gpt-5"
     server_url: str = "http://localhost:7777"
+    default_agent: str = "high-autonomy"
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(exclude_none=True)
@@ -40,41 +41,53 @@ class HeidiSecrets(BaseModel):
 
 
 class ConfigManager:
-    HEIDI_DIR = Path.home() / ".heidi"
-    CONFIG_FILE = HEIDI_DIR / "config.json"
-    SECRETS_FILE = HEIDI_DIR / "secrets.json"
-    RUNS_DIR = HEIDI_DIR / "runs"
     TASKS_DIR = Path("./tasks")
 
     @classmethod
+    def heidi_dir(cls) -> Path:
+        return Path.cwd() / ".heidi"
+
+    @classmethod
+    def config_file(cls) -> Path:
+        return cls.heidi_dir() / "config.json"
+
+    @classmethod
+    def secrets_file(cls) -> Path:
+        return cls.heidi_dir() / "secrets.json"
+
+    @classmethod
+    def runs_dir(cls) -> Path:
+        return cls.heidi_dir() / "runs"
+
+    @classmethod
     def ensure_dirs(cls) -> None:
-        cls.HEIDI_DIR.mkdir(parents=True, exist_ok=True)
-        cls.RUNS_DIR.mkdir(parents=True, exist_ok=True)
+        cls.heidi_dir().mkdir(parents=True, exist_ok=True)
+        cls.runs_dir().mkdir(parents=True, exist_ok=True)
 
     @classmethod
     def load_config(cls) -> HeidiConfig:
-        if not cls.CONFIG_FILE.exists():
+        if not cls.config_file().exists():
             return HeidiConfig()
-        data = json.loads(cls.CONFIG_FILE.read_text())
+        data = json.loads(cls.config_file().read_text())
         return HeidiConfig.from_dict(data)
 
     @classmethod
     def save_config(cls, config: HeidiConfig) -> None:
         cls.ensure_dirs()
-        cls.CONFIG_FILE.write_text(json.dumps(config.to_dict(), indent=2))
+        cls.config_file().write_text(json.dumps(config.to_dict(), indent=2))
 
     @classmethod
     def load_secrets(cls) -> HeidiSecrets:
-        if not cls.SECRETS_FILE.exists():
+        if not cls.secrets_file().exists():
             return HeidiSecrets()
-        data = json.loads(cls.SECRETS_FILE.read_text())
+        data = json.loads(cls.secrets_file().read_text())
         return HeidiSecrets.from_dict(data)
 
     @classmethod
     def save_secrets(cls, secrets: HeidiSecrets) -> None:
         cls.ensure_dirs()
-        cls.SECRETS_FILE.write_text(json.dumps(secrets.to_dict(), indent=2))
-        os.chmod(cls.SECRETS_FILE, 0o600)
+        cls.secrets_file().write_text(json.dumps(secrets.to_dict(), indent=2))
+        os.chmod(cls.secrets_file(), 0o600)
 
     @classmethod
     def get_github_token(cls) -> Optional[str]:
