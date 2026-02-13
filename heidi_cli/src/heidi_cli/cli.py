@@ -1,0 +1,475 @@
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+import shutil
+from pathlib import Path
+from typing import Any, Optional
+
+import typer
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+
+from .config import ConfigManager
+from .logging import HeidiLogger, setup_global_logging
+from .orchestrator.loop import run_loop, pick_executor as _pick_executor
+from .orchestrator.registry import AgentRegistry
+
+app = typer.Typer(add_completion=False, help="Heidi CLI - Copilot/Jules/OpenCode orchestrator")
+copilot_app = typer.Typer(help="Copilot (Copilot CLI via GitHub Copilot SDK)")
+auth_app = typer.Typer(help="Authentication commands")
+agents_app = typer.Typer(help="Agent management")
+valves_app = typer.Typer(help="Configuration valves")
+
+app.add_typer(copilot_app, name="copilot")
+app.add_typer(auth_app, name="auth")
+app.add_typer(agents_app, name="agents")
+app.add_typer(valves_app, name="valves")
+
+console = Console()
+json_output = False
+verbose_mode = False
+
+
+def get_version() -> str:
+    from . import __version__
+    return __version__
+
+
+def print_json(data: Any) -> None:
+    if json_output:
+        print(json.dumps(data, indent=2))
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(False, "--version", help="Show version"),
+    json: bool = typer.Option(False, "--json", help="Output JSON"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose logging"),
+) -> None:
+    global json_output, verbose_mode
+    json_output = json
+    verbose_mode = verbose
+    if verbose:
+        setup_global_logging("DEBUG")
+    if version:
+        console.print(f"Heidi CLI v{get_version()}")
+        raise typer.Exit(0)
+
+
+@app.command()
+def init(
+    force: bool = typer.Option(False, "--force", help="Overwrite existing config"),
+) -> None:
+    """Initialize Heidi CLI configuration directory."""
+    ConfigManager.ensure_dirs()
+
+    if ConfigManager.CONFIG_FILE.exists() and not force:
+        console.print("[yellow]Heidi already initialized. Use --force to reinitialize.[/yellow]")
+        return
+
+    config = ConfigManager.load_config()
+    ConfigManager.save_config(config)
+    console.print(f"[green]Initialized Heidi at {ConfigManager.HEIDI_DIR}[/green]")
+    console.print(f"  Config: {ConfigManager.CONFIG_FILE}")
+    console.print(f"  Secrets: {ConfigManager.SECRETS_FILE}")
+    console.print(f"  Runs: {ConfigManager.RUNS_DIR}")
+    console.print(f"  Tasks: {ConfigManager.TASKS_DIR}")
+
+
+@app.command()
+def doctor() -> None:
+    """Check health of all executors and dependencies."""
+    table = Table(title="Heidi CLI Health Check")
+    table.add_column("Component", style="cyan")
+    table.add_column("Status", style="green")
+    table.add_column("Version/Notes", style="white")
+
+    checks = []
+
+    result = shutil.which("python")
+    checks.append(("Python", "ok" if result else "missing", result or ""))
+
+    # Check if copilot SDK is installed (without importing, to avoid triggering runtime)
+    import importlib.util
+    if importlib.util.find_spec("copilot"):
+        checks.append(("Copilot SDK", "ok", "installed"))
+    else:
+        checks.append(("Copilot SDK", "missing", "pip install github-copilot-sdk"))
+
+    result = shutil.which("opencode")
+    checks.append(("OpenCode", "ok" if result else "not found", result or ""))
+
+    result = shutil.which("jules")
+    checks.append(("Jules CLI", "ok" if result else "not found", result or ""))
+
+    result = shutil.which("code")
+    checks.append(("VS Code", "ok" if result else "not found", result or ""))
+
+    for name, status, notes in checks:
+        style = "green" if status == "ok" else "yellow"
+        table.add_row(name, f"[{style}]{status}[/{style}]", notes)
+
+    console.print(table)
+
+    missing = [n for n, s, _ in checks if s != "ok"]
+    if missing:
+        console.print(f"[yellow]Warning: Missing components: {', '.join(missing)}[/yellow]")
+
+
+@auth_app.command("gh")
+def auth_gh(
+    token: Optional[str] = typer.Option(None, help="GitHub token (or prompt if not provided)"),
+    store_keyring: bool = typer.Option(True, help="Store in OS keyring"),
+) -> None:
+    """Authenticate with GitHub for Copilot access."""
+    if not token:
+        token = typer.prompt("Enter GitHub token (with copilot scope)", hide_input=True)
+
+    if not token:
+        console.print("[red]Token required[/red]")
+        raise typer.Exit(1)
+
+    ConfigManager.set_github_token(token, store_keyring=store_keyring)
+    console.print("[green]GitHub token stored successfully[/green]")
+
+    if store_keyring:
+        console.print("[dim]Token stored in OS keyring[/dim]")
+
+
+@auth_app.command("status")
+def auth_status() -> None:
+    """Show authentication status."""
+    token = ConfigManager.get_github_token()
+    if token:
+        console.print("[green]GitHub token: configured[/green]")
+    else:
+        console.print("[yellow]GitHub token: not configured[/yellow]")
+
+
+@copilot_app.command("doctor")
+def copilot_doctor() -> None:
+    """Check Copilot SDK health and auth status."""
+    from .copilot_runtime import CopilotRuntime
+
+    async def _run():
+        rt: Optional[CopilotRuntime] = None
+        try:
+            table = Table(title="Copilot SDK Status")
+            table.add_column("Check", style="cyan")
+            table.add_column("Status", style="green")
+
+            import importlib.util
+            sdk_present = bool(importlib.util.find_spec("copilot"))
+            table.add_row("Copilot SDK import", "ok" if sdk_present else "missing")
+
+            env_present = bool(
+                (os.getenv("COPILOT_GITHUB_TOKEN") or "").strip()
+                or (os.getenv("GH_TOKEN") or "").strip()
+                or (os.getenv("GITHUB_TOKEN") or "").strip()
+            )
+            secrets_present = bool((ConfigManager.load_secrets().github_token or "").strip())
+            keyring_present = ConfigManager.has_github_token_in_keyring()
+            effective_present = bool((ConfigManager.get_github_token() or "").strip())
+            table.add_row("Token present (env)", str(env_present))
+            table.add_row("Token present (secrets.json)", str(secrets_present))
+            table.add_row("Token present (keyring)", str(keyring_present))
+            table.add_row("Token present (effective)", str(effective_present))
+
+            rt = CopilotRuntime()
+            await rt.start()
+
+            try:
+                st = await rt.client.get_status()
+                table.add_row("CLI State", "connected")
+                table.add_row("CLI Version", str(getattr(st, 'cliVersion', 'unknown')))
+            except Exception:
+                table.add_row("CLI State", "error")
+
+            try:
+                auth = await rt.client.get_auth_status()
+                table.add_row("Authenticated", str(getattr(auth, 'isAuthenticated', False)))
+                table.add_row("Login", str(getattr(auth, 'login', 'unknown')))
+            except Exception:
+                table.add_row("Authenticated", "unknown")
+                table.add_row("Login", "unknown")
+
+            console.print(table)
+        except Exception as e:
+            console.print(f"[red]Doctor check failed: {e}[/red]")
+            raise typer.Exit(1)
+        finally:
+            if rt is not None:
+                try:
+                    await rt.stop()
+                except Exception:
+                    pass
+
+    asyncio.run(_run())
+
+
+@copilot_app.command("status")
+def copilot_status() -> None:
+    """Print auth + health status from Copilot CLI."""
+    from .copilot_runtime import CopilotRuntime
+    
+    async def _run():
+        try:
+            rt = CopilotRuntime()
+            await rt.start()
+            try:
+                st = await rt.client.get_status()
+                auth = await rt.client.get_auth_status()
+                console.print(
+                    Panel.fit(
+                        f"state={getattr(st, 'state', 'unknown')}\n"
+                        f"cliVersion={getattr(st, 'cliVersion', 'unknown')}\n\n"
+                        f"isAuthenticated={getattr(auth, 'isAuthenticated', False)}\n"
+                        f"login={getattr(auth, 'login', 'unknown')}",
+                        title="Copilot SDK Status",
+                    )
+                )
+            finally:
+                await rt.stop()
+        except Exception as e:
+            console.print(Panel.fit(f"state=error\nerror={e}", title="Copilot SDK Status"))
+    asyncio.run(_run())
+
+
+@copilot_app.command("chat")
+def copilot_chat(
+    prompt: str,
+    model: Optional[str] = None,
+    timeout: int = typer.Option(120, "--timeout", help="Timeout seconds"),
+) -> None:
+    """Send a single prompt and print the assistant response."""
+    from .copilot_runtime import CopilotRuntime
+    
+    async def _run():
+        rt = CopilotRuntime(model=model)
+        await rt.start()
+        try:
+            text = await rt.send_and_wait(prompt, timeout_s=timeout)
+            console.print(text)
+        finally:
+            await rt.stop()
+    asyncio.run(_run())
+
+
+@agents_app.command("list")
+def agents_list() -> None:
+    """List all available agents."""
+    agents = AgentRegistry.list_agents()
+
+    table = Table(title="Available Agents")
+    table.add_column("Name", style="cyan")
+    table.add_column("Description", style="white")
+
+    for name, desc in agents:
+        table.add_row(name, desc)
+
+    console.print(table)
+
+    missing = AgentRegistry.validate_required()
+    if missing:
+        console.print(f"[yellow]Warning: Missing required agents: {', '.join(missing)}[/yellow]")
+
+
+@valves_app.command("get")
+def valves_get(key: str) -> None:
+    """Get a configuration valve value."""
+    value = ConfigManager.get_valve(key)
+    if value is None:
+        console.print(f"[yellow]Valve '{key}' not found[/yellow]")
+    else:
+        console.print(f"{key} = {json.dumps(value)}")
+
+
+@valves_app.command("set")
+def valves_set(key: str, value: str) -> None:
+    """Set a configuration valve value."""
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        parsed = value
+
+    ConfigManager.set_valve(key, parsed)
+    console.print(f"[green]Set {key} = {json.dumps(parsed)}[/green]")
+
+
+@app.command("loop")
+def loop(
+    task: str,
+    executor: Optional[str] = typer.Option(None, help="copilot | jules | opencode | vscode"),
+    max_retries: Optional[int] = typer.Option(None, help="Max re-plans after FAIL"),
+    workdir: Path = typer.Option(Path.cwd(), help="Repo working directory"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print what would be executed"),
+) -> None:
+    """Run: Plan -> execute handoffs -> audit -> PASS/FAIL (starter loop)."""
+    if executor is None:
+        executor = str(ConfigManager.get_valve("DEFAULT_EXECUTOR") or "copilot")
+    if max_retries is None:
+        max_retries = int(ConfigManager.get_valve("MAX_RETRIES") or 2)
+
+    if dry_run:
+        console.print("[yellow]DRY RUN: Would execute loop with:[/yellow]")
+        console.print(f"  task: {task}")
+        console.print(f"  executor: {executor}")
+        console.print(f"  max_retries: {max_retries}")
+        console.print(f"  workdir: {workdir}")
+        return
+
+    setup_global_logging()
+    run_id = HeidiLogger.init_run()
+
+    HeidiLogger.write_run_meta({
+        "run_id": run_id,
+        "task": task,
+        "executor": executor,
+        "max_retries": max_retries,
+        "workdir": str(workdir),
+    })
+
+    console.print(f"[cyan]Starting loop {run_id}: {task}[/cyan]")
+    HeidiLogger.emit_status(f"Loop started with executor={executor}")
+
+    async def _run():
+        try:
+            result = await run_loop(task=task, executor=executor, max_retries=max_retries, workdir=workdir)
+            HeidiLogger.emit_result(result)
+            console.print(Panel.fit(result, title=f"Loop {run_id} Result"))
+            HeidiLogger.write_run_meta({"status": "completed", "result": result})
+        except Exception as e:
+            error_msg = f"Loop failed: {e}"
+            HeidiLogger.error(error_msg)
+            HeidiLogger.write_run_meta({"status": "failed", "error": str(e)})
+            console.print(f"[red]{error_msg}[/red]")
+            raise typer.Exit(1)
+
+    asyncio.run(_run())
+
+
+@app.command("run")
+def run(
+    prompt: str,
+    executor: Optional[str] = typer.Option(None, help="copilot | jules | opencode | vscode"),
+    workdir: Path = typer.Option(Path.cwd(), help="Repo working directory"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print what would be executed"),
+) -> None:
+    """Run a single prompt with the specified executor."""
+    if executor is None:
+        executor = str(ConfigManager.get_valve("DEFAULT_EXECUTOR") or "copilot")
+
+    if dry_run:
+        console.print("[yellow]DRY RUN: Would execute:[/yellow]")
+        console.print(f"  executor: {executor}")
+        console.print(f"  prompt: {prompt[:100]}...")
+        console.print(f"  workdir: {workdir}")
+        return
+
+    setup_global_logging()
+    run_id = HeidiLogger.init_run()
+
+    HeidiLogger.write_run_meta({
+        "run_id": run_id,
+        "prompt": prompt,
+        "executor": executor,
+        "workdir": str(workdir),
+    })
+
+    async def _run():
+        exec_impl = _pick_executor(executor)
+        try:
+            result = await exec_impl.run(prompt, workdir)
+            console.print(result.output)
+            HeidiLogger.write_run_meta({"status": "completed", "ok": result.ok})
+        except Exception as e:
+            error_msg = f"Run failed: {e}"
+            HeidiLogger.error(error_msg)
+            HeidiLogger.write_run_meta({"status": "failed", "error": str(e)})
+            raise typer.Exit(1)
+
+    asyncio.run(_run())
+
+
+@app.command("verify")
+def verify(
+    commands: list[str] = typer.Argument(..., help="Commands to verify"),
+    workdir: Path = typer.Option(Path.cwd(), help="Working directory"),
+) -> None:
+    """Run verification commands and report results."""
+    from .orchestrator.workspace import WorkspaceManager, VerificationRunner
+
+    ws = WorkspaceManager(workdir)
+    runner = VerificationRunner(ws)
+
+    console.print(f"[cyan]Running {len(commands)} verification commands...[/cyan]")
+    results = runner.run_commands(commands)
+
+    table = Table(title="Verification Results")
+    table.add_column("Command", style="cyan")
+    table.add_column("Status", style="white")
+    table.add_column("Output", style="white")
+
+    all_passed = True
+    for cmd, result in results.items():
+        status = "PASS" if result["returncode"] == "0" else "FAIL"
+        if status == "FAIL":
+            all_passed = False
+        output = result["stdout"][:100] or result["stderr"][:100] or ""
+        table.add_row(cmd[:50], status, output)
+
+    console.print(table)
+
+    if all_passed:
+        console.print("[green]All verifications passed[/green]")
+    else:
+        console.print("[red]Some verifications failed[/red]")
+        raise typer.Exit(1)
+
+
+@app.command("runs")
+def runs_list(
+    limit: int = typer.Option(10, help="Number of runs to show"),
+) -> None:
+    """List recent runs."""
+    runs_dir = ConfigManager.RUNS_DIR
+    if not runs_dir.exists():
+        console.print("[yellow]No runs found[/yellow]")
+        return
+
+    runs = sorted(runs_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)[:limit]
+
+    table = Table(title="Recent Runs")
+    table.add_column("Run ID", style="cyan")
+    table.add_column("Status", style="white")
+    table.add_column("Task", style="white")
+
+    for run_path in runs:
+        run_json = run_path / "run.json"
+        if run_json.exists():
+            meta = json.loads(run_json.read_text())
+            status = meta.get("status", "unknown")
+            task = meta.get("task", meta.get("prompt", ""))[:50]
+            table.add_row(run_path.name, status, task)
+        else:
+            table.add_row(run_path.name, "unknown", "")
+
+    console.print(table)
+
+
+@app.command("serve")
+def serve(
+    host: str = typer.Option("0.0.0.0", help="Host to bind to"),
+    port: int = typer.Option(7777, help="Port to bind to"),
+) -> None:
+    """Start Heidi CLI HTTP server for OpenWebUI integration."""
+    from .server import start_server
+    console.print(f"[green]Starting Heidi server on {host}:{port}[/green]")
+    start_server(host=host, port=port)
+
+
+if __name__ == "__main__":
+    app()

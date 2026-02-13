@@ -1,0 +1,92 @@
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+from ..config import ConfigManager
+from ..logging import HeidiLogger
+
+
+@dataclass
+class TaskArtifact:
+    slug: str
+    content: str = ""
+    audit_content: str = ""
+    progress_content: str = ""
+    status: str = "pending"
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+
+    def save(self) -> Path:
+        task_dir = ConfigManager.TASKS_DIR / self.slug
+        task_dir.mkdir(parents=True, exist_ok=True)
+
+        (task_dir / "task.md").write_text(self.content)
+        (task_dir / "audit.md").write_text(self.audit_content)
+        (task_dir / "progress.md").write_text(self.progress_content)
+
+        meta = {
+            "slug": self.slug,
+            "status": self.status,
+            "created_at": self.created_at,
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+        (task_dir / "meta.json").write_text(json.dumps(meta, indent=2))
+
+        return task_dir
+
+    @classmethod
+    def load(cls, slug: str) -> Optional[TaskArtifact]:
+        task_dir = ConfigManager.TASKS_DIR / slug
+        if not task_dir.exists():
+            return None
+
+        meta = json.loads((task_dir / "meta.json").read_text())
+        content = (task_dir / "task.md").read_text() if (task_dir / "task.md").exists() else ""
+        audit = (task_dir / "audit.md").read_text() if (task_dir / "audit.md").exists() else ""
+        progress = (task_dir / "progress.md").read_text() if (task_dir / "progress.md").exists() else ""
+
+        return cls(
+            slug=slug,
+            content=content,
+            audit_content=audit,
+            progress_content=progress,
+            status=meta.get("status", "pending"),
+            created_at=meta.get("created_at", ""),
+            updated_at=meta.get("updated_at", ""),
+        )
+
+
+def sanitize_slug(text: str) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9_-]", "_", text.lower())
+    slug = re.sub(r"_+", "_", slug)
+    return slug[:50]
+
+
+def create_task_artifact(task: str) -> TaskArtifact:
+    slug = sanitize_slug(task)
+    artifact = TaskArtifact(slug=slug, content=f"# Task: {task}\n\nCreated: {datetime.utcnow().isoformat()}\n")
+    artifact.save()
+    HeidiLogger.write_event("task_created", {"slug": slug, "task": task})
+    return artifact
+
+
+def update_task_progress(slug: str, progress: str) -> None:
+    artifact = TaskArtifact.load(slug)
+    if artifact:
+        artifact.progress_content += f"\n{datetime.utcnow().isoformat()}: {progress}"
+        artifact.save()
+        HeidiLogger.write_event("progress_update", {"slug": slug, "progress": progress})
+
+
+def update_task_audit(slug: str, audit_result: str, passed: bool) -> None:
+    artifact = TaskArtifact.load(slug)
+    if artifact:
+        artifact.audit_content += f"\n{datetime.utcnow().isoformat()} - {'PASS' if passed else 'FAIL'}: {audit_result}"
+        artifact.status = "passed" if passed else "failed"
+        artifact.save()
+        HeidiLogger.write_event("audit_update", {"slug": slug, "passed": passed, "result": audit_result})
