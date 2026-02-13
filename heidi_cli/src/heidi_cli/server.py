@@ -28,7 +28,16 @@ _cors_env = os.getenv("HEIDI_CORS_ORIGINS", "").strip()
 if _cors_env:
     ALLOW_ORIGINS = [o.strip() for o in _cors_env.split(",") if o.strip()]
 else:
-    ALLOW_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"] if HEIDI_API_KEY else ["*"]
+    ALLOW_ORIGINS = (
+        [
+            "http://localhost:3001",
+            "http://127.0.0.1:3001",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ]
+        if HEIDI_API_KEY
+        else ["*"]
+    )
 
 app = FastAPI(title="Heidi CLI Server")
 
@@ -58,6 +67,7 @@ async def root():
     """Redirect root to /ui/ for the UI"""
     if UI_DIST.exists():
         from fastapi.responses import RedirectResponse
+
         return RedirectResponse(url="/ui/")
     return {"status": "ok", "service": "heidi-cli", "ui": "visit /ui for the web interface"}
 
@@ -66,6 +76,7 @@ async def root():
 async def ui_index():
     """Redirect /ui to /ui/ for proper SPA routing"""
     from fastapi.responses import RedirectResponse
+
     return RedirectResponse(url="/ui/")
 
 
@@ -77,18 +88,19 @@ async def serve_ui(path: str):
             "<html><body><h1>UI Not Built</h1><p>Run <code>heidi ui build</code> to build the UI.</p></body></html>",
             status_code=200,
         )
-    
+
     from fastapi.staticfiles import StaticFiles
+
     # Let StaticFiles handle the file serving
     file_path = UI_DIST / path
     if file_path.is_file():
         return StaticFiles(directory=str(UI_DIST)).get_path(path)
-    
+
     # For SPA, serve index.html for non-file paths
     index_path = UI_DIST / "index.html"
     if index_path.exists():
         return HTMLResponse(index_path.read_text())
-    
+
     return HTMLResponse(
         "<html><body><h1>404</h1><p>File not found</p></body></html>",
         status_code=404,
@@ -98,7 +110,7 @@ async def serve_ui(path: str):
 @app.get("/agents")
 async def list_agents():
     from .orchestrator.registry import AgentRegistry
-    
+
     agents = AgentRegistry.list_agents()
     return [{"name": name, "description": desc} for name, desc in agents]
 
@@ -119,16 +131,20 @@ async def list_runs(limit: int = 10, request: Request = None):
         return []
 
     runs = []
-    for run_path in sorted(runs_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)[:limit]:
+    for run_path in sorted(runs_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)[
+        :limit
+    ]:
         run_json = run_path / "run.json"
         if run_json.exists():
             meta = json.loads(run_json.read_text())
-            runs.append({
-                "run_id": run_path.name,
-                "status": meta.get("status", "unknown"),
-                "task": meta.get("task", meta.get("prompt", "")),
-                "executor": meta.get("executor", ""),
-            })
+            runs.append(
+                {
+                    "run_id": run_path.name,
+                    "status": meta.get("status", "unknown"),
+                    "task": meta.get("task", meta.get("prompt", "")),
+                    "executor": meta.get("executor", ""),
+                }
+            )
 
     return runs
 
@@ -231,12 +247,14 @@ async def run(request: RunRequest, http_request: Request):
         workdir = Path.cwd()
 
     run_id = HeidiLogger.init_run()
-    HeidiLogger.write_run_meta({
-        "run_id": run_id,
-        "prompt": request.prompt,
-        "executor": request.executor,
-        "workdir": str(workdir),
-    })
+    HeidiLogger.write_run_meta(
+        {
+            "run_id": run_id,
+            "prompt": request.prompt,
+            "executor": request.executor,
+            "workdir": str(workdir),
+        }
+    )
 
     try:
         executor = pick_executor(request.executor)
@@ -259,13 +277,15 @@ async def loop(request: LoopRequest, http_request: Request):
         workdir = Path.cwd()
 
     run_id = HeidiLogger.init_run()
-    HeidiLogger.write_run_meta({
-        "run_id": run_id,
-        "task": request.task,
-        "executor": request.executor,
-        "max_retries": request.max_retries,
-        "workdir": str(workdir),
-    })
+    HeidiLogger.write_run_meta(
+        {
+            "run_id": run_id,
+            "task": request.task,
+            "executor": request.executor,
+            "max_retries": request.max_retries,
+            "workdir": str(workdir),
+        }
+    )
 
     try:
         result = await run_loop(
