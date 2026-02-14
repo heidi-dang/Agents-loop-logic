@@ -16,7 +16,24 @@ from .executors import (
 from .plan import build_plan_prompt, extract_routing, parse_routing
 from .registry import AgentRegistry
 from .artifacts import TaskArtifact, sanitize_slug, save_audit_to_task
-from ..logging import redact_secrets
+from ..logging import redact_secrets, HeidiLogger
+
+
+class LineBuffer:
+    def __init__(self, callback):
+        self.callback = callback
+        self.buffer = ""
+
+    def feed(self, chunk: str):
+        self.buffer += chunk
+        while "\n" in self.buffer:
+            line, self.buffer = self.buffer.split("\n", 1)
+            self.callback(line)
+
+    def flush(self):
+        if self.buffer:
+            self.callback(self.buffer)
+            self.buffer = ""
 
 
 def pick_executor(name: str, model: Optional[str] = None):
@@ -229,8 +246,23 @@ async def run_loop(
 
     while True:
         # 1) Plan
+        HeidiLogger.emit_run_state("planning")
+        tool_id = HeidiLogger.emit_tool_start("Generating Plan")
+
+        def log_plan_line(line: str):
+            HeidiLogger.emit_tool_log(tool_id, line)
+
+        buffer = LineBuffer(log_plan_line)
+
         plan_prompt = build_plan_prompt(task)
-        plan_res = await exec_impl.run(plan_prompt, workdir)
+        try:
+            plan_res = await exec_impl.run(plan_prompt, workdir, on_chunk=buffer.feed)
+            buffer.flush()
+        except Exception as e:
+            HeidiLogger.emit_tool_error(tool_id, str(e))
+            raise e
+
+        HeidiLogger.emit_tool_done(tool_id)
 
         if not plan_res.ok:
             artifact.content += f"\n## Plan Failed\n{plan_res.output}"
@@ -278,7 +310,22 @@ IMPORTANT: When done, output DEV_COMPLETION block with:
 """
 
             # Run the agent
-            run_res = await batch_exec.run(batch_prompt, workdir)
+            HeidiLogger.emit_run_state("executing")
+            batch_tool_id = HeidiLogger.emit_tool_start(f"Executing Batch: {label}")
+
+            def log_batch_line(line: str):
+                HeidiLogger.emit_tool_log(batch_tool_id, line)
+
+            batch_buffer = LineBuffer(log_batch_line)
+
+            try:
+                run_res = await batch_exec.run(batch_prompt, workdir, on_chunk=batch_buffer.feed)
+                batch_buffer.flush()
+            except Exception as e:
+                HeidiLogger.emit_tool_error(batch_tool_id, str(e))
+                raise e
+
+            HeidiLogger.emit_tool_done(batch_tool_id)
 
             # Redact secrets before storing
             safe_output = redact_secrets(run_res.output)
@@ -295,6 +342,7 @@ IMPORTANT: When done, output DEV_COMPLETION block with:
 
             # Check for DEV_COMPLETION markers - re-ask once if missing
             if "DEV_COMPLETION" not in run_res.output:
+                HeidiLogger.emit_tool_log(batch_tool_id, "Re-requesting DEV_COMPLETION markers...")
                 run_res = await batch_exec.run(
                     batch_prompt
                     + "\n\nIMPORTANT: You MUST output DEV_COMPLETION markers when done.",
@@ -310,10 +358,26 @@ IMPORTANT: When done, output DEV_COMPLETION block with:
             self_audit_agent = AgentRegistry.get("self-auditing")
             self_audit_passed = True
             if self_audit_agent:
+                HeidiLogger.emit_run_state("auditing")
+                sa_tool_id = HeidiLogger.emit_tool_start("Self-Audit")
+
+                def log_sa_line(line: str):
+                    HeidiLogger.emit_tool_log(sa_tool_id, line)
+
+                sa_buffer = LineBuffer(log_sa_line)
+
                 self_audit_prompt = (
                     f"{self_audit_agent['prompt']}\n\nYour output:\n{run_res.output}"
                 )
-                self_audit_res = await batch_exec.run(self_audit_prompt, workdir)
+                try:
+                    self_audit_res = await batch_exec.run(self_audit_prompt, workdir, on_chunk=sa_buffer.feed)
+                    sa_buffer.flush()
+                except Exception as e:
+                    HeidiLogger.emit_tool_error(sa_tool_id, str(e))
+                    raise e
+
+                HeidiLogger.emit_tool_done(sa_tool_id)
+
                 self_audit_output = redact_secrets(self_audit_res.output)
 
                 artifact.content += f"\n### Self-Audit\n{self_audit_output[:1000]}"
@@ -331,6 +395,14 @@ IMPORTANT: When done, output DEV_COMPLETION block with:
                 reviewer_agent = AgentRegistry.get(reviewer)
                 if not reviewer_agent:
                     continue
+
+                HeidiLogger.emit_run_state("reviewing")
+                rev_tool_id = HeidiLogger.emit_tool_start(f"Review: {reviewer}")
+
+                def log_rev_line(line: str):
+                    HeidiLogger.emit_tool_log(rev_tool_id, line)
+
+                rev_buffer = LineBuffer(log_rev_line)
 
                 reviewer_prompt = f"""{reviewer_agent["prompt"]}
 
@@ -350,7 +422,15 @@ AUDIT_DECISION:
 - recommended_next_step: rerun_dev_batch:<label> | handoff_to_planner | accept_as_is
 END_AUDIT_DECISION
 """
-                audit_res = await batch_exec.run(reviewer_prompt, workdir)
+                try:
+                    audit_res = await batch_exec.run(reviewer_prompt, workdir, on_chunk=rev_buffer.feed)
+                    rev_buffer.flush()
+                except Exception as e:
+                    HeidiLogger.emit_tool_error(rev_tool_id, str(e))
+                    raise e
+
+                HeidiLogger.emit_tool_done(rev_tool_id)
+
                 audit_output = redact_secrets(audit_res.output)
 
                 artifact.content += f"\n### {reviewer} Review\n{audit_output[:2000]}"

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Callable
 
 from copilot import CopilotClient
 
@@ -133,7 +133,9 @@ class CopilotRuntime:
         finally:
             await self.client.stop()
 
-    async def send_and_wait(self, prompt: str, timeout_s: int = 120) -> str:
+    async def send_and_wait(
+        self, prompt: str, timeout_s: int = 120, on_chunk: Optional[Callable[[str], None]] = None
+    ) -> str:
         if self._session is None:
             raise RuntimeError("CopilotRuntime not started")
         done = asyncio.Event()
@@ -146,6 +148,8 @@ class CopilotRuntime:
                 content = getattr(getattr(event, "data", None), "content", None)
                 if isinstance(content, str):
                     chunks.append(content)
+                    if on_chunk:
+                        on_chunk(content)
             elif t == "session.idle":
                 done.set()
 

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { api, getSettings } from '../api/heidi';
-import { Agent, AppMode, RunEvent, RunStatus } from '../types';
+import { api } from '../api/heidi';
+import { Agent, AppMode, RunEvent, RunStatus, Message, MessageStatus, ToolEvent } from '../types';
 import { 
   Send, Repeat, StopCircle, CheckCircle, AlertCircle, Loader2, PlayCircle, PanelLeft,
-  Sparkles, Cpu, Search, Map, Terminal, Eye, Shield, MessageSquare
+  Sparkles, Cpu, Map, Terminal, Eye, Shield, MessageSquare, ArrowDown
 } from 'lucide-react';
+import ThinkingBubble from '../components/ThinkingBubble';
+import ToolCard from '../components/ToolCard';
 
 interface ChatProps {
   initialRunId?: string | null;
@@ -25,22 +27,25 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
   // Runtime State
   const [runId, setRunId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('idle');
-  const [transcript, setTranscript] = useState<RunEvent[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
 
+  // Scroll State
+  const [isAtBottom, setIsAtBottom] = useState(true);
+
   // Refs for streaming management
   const eventSourceRef = useRef<EventSource | null>(null);
   const pollingRef = useRef<any>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // --- Initialization ---
 
   useEffect(() => {
     api.getAgents().then(setAgents).catch(() => {
-      // Fallback if agents endpoint is not ready
       setAgents([{ name: 'copilot', description: 'Default executor' }]);
     });
   }, []);
@@ -55,10 +60,10 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
   }, [initialRunId]);
 
   useEffect(() => {
-    if (chatBottomRef.current) {
+    if (isAtBottom && chatBottomRef.current) {
       chatBottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [transcript, status]);
+  }, [messages, status]); // Removed isAtBottom to prevent loop, added it implicitly via condition
 
   useEffect(() => {
     return () => stopStreaming();
@@ -69,12 +74,13 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
   const resetChat = () => {
     stopStreaming();
     setRunId(null);
-    setTranscript([]);
+    setMessages([]);
     setStatus('idle');
     setResult(null);
     setError(null);
     setPrompt('');
     setIsCancelling(false);
+    setIsAtBottom(true);
   };
 
   const stopStreaming = () => {
@@ -88,16 +94,104 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
     }
   };
 
+  const processEvents = (events: RunEvent[], currentMessages: Message[], currentRunId: string): Message[] => {
+      // Deep clone to ensure immutability
+      let newMessages = JSON.parse(JSON.stringify(currentMessages)) as Message[];
+
+      let assistantMsg = newMessages.find(m => m.role === 'assistant' && m.id.startsWith(`asst-${currentRunId}`));
+
+      if (!assistantMsg && events.length > 0) {
+          assistantMsg = {
+              id: `asst-${currentRunId}`,
+              role: 'assistant',
+              status: 'thinking',
+              content: '',
+              createdAt: Date.now(),
+              toolEvents: []
+          };
+          newMessages.push(assistantMsg);
+      }
+
+      for (const event of events) {
+          if (event.type === 'user_prompt') {
+              const existingUserMsg = newMessages.find(m => m.role === 'user');
+              if (!existingUserMsg) {
+                  newMessages.unshift({
+                      id: `user-${event.ts}`,
+                      role: 'user',
+                      status: 'done',
+                      content: event.message || '',
+                      createdAt: new Date(event.ts).getTime()
+                  });
+              }
+              continue;
+          }
+
+          if (!assistantMsg) continue;
+
+          if (event.type === 'tool_start') {
+               const data = event.data || {};
+               const toolId = data.tool_id || `tool-${event.ts}`;
+
+               if (!assistantMsg.toolEvents?.find(t => t.id === toolId)) {
+                   if (!assistantMsg.toolEvents) assistantMsg.toolEvents = [];
+                   assistantMsg.toolEvents.push({
+                       id: toolId,
+                       title: data.title || 'Processing...',
+                       status: 'running',
+                       lines: [],
+                       updatedAt: new Date(event.ts).getTime()
+                   });
+                   assistantMsg.status = 'streaming';
+               }
+          } else if (event.type === 'tool_log') {
+               const data = event.data || {};
+               const tool = assistantMsg.toolEvents?.find(t => t.id === data.tool_id);
+               if (tool) {
+                   tool.lines.push(data.line || '');
+                   tool.updatedAt = new Date(event.ts).getTime();
+               }
+          } else if (event.type === 'tool_done') {
+               const data = event.data || {};
+               const tool = assistantMsg.toolEvents?.find(t => t.id === data.tool_id);
+               if (tool) {
+                   tool.status = 'done';
+                   tool.updatedAt = new Date(event.ts).getTime();
+               }
+          } else if (event.type === 'tool_error') {
+               const data = event.data || {};
+               const tool = assistantMsg.toolEvents?.find(t => t.id === data.tool_id);
+               if (tool) {
+                   tool.status = 'error';
+                   tool.lines.push(`Error: ${data.error}`);
+                   tool.updatedAt = new Date(event.ts).getTime();
+               }
+          } else if (event.type === 'message_delta') {
+               const data = event.data || {};
+               assistantMsg.content += (data.deltaText || '');
+               assistantMsg.status = 'streaming';
+          }
+      }
+
+      return newMessages;
+  };
+
   const loadRun = async (id: string) => {
     stopStreaming();
     setRunId(id);
-    setTranscript([]); 
+    setMessages([]);
     setError(null);
     setResult(null);
+    setIsAtBottom(true);
 
     try {
       const details = await api.getRun(id);
-      setTranscript(details.events || []);
+
+      if (details.events) {
+          const reconstructed = processEvents(details.events, [], id);
+          setMessages(reconstructed);
+      }
+
       setStatus(details.meta?.status || 'unknown');
       setMode(details.meta?.task ? AppMode.LOOP : AppMode.RUN);
       setExecutor(details.meta?.executor || 'copilot');
@@ -109,15 +203,20 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
         details.meta?.status !== RunStatus.FAILED
       ) {
         startStreaming(id);
+      } else {
+         setMessages(prev => {
+             // Use functional update with deep clone for consistency
+             const newMsgs = JSON.parse(JSON.stringify(prev)) as Message[];
+             const asst = newMsgs.find(m => m.role === 'assistant');
+             if (asst) asst.status = 'done';
+             return newMsgs;
+         });
       }
     } catch (err) {
       console.error(err);
       setError('Failed to load run details');
     }
   };
-
-  const terminalStatuses = new Set(['completed', 'failed', 'cancelled', 'idle']);
-  const isRunning = runId && !terminalStatuses.has(status.toLowerCase());
 
   const handleStart = async () => {
     if (!prompt.trim()) return;
@@ -126,17 +225,39 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
     setIsSending(true);
     setStatus('initiating');
 
+    const userMsg: Message = {
+        id: `user-temp-${Date.now()}`,
+        role: 'user',
+        status: 'done',
+        content: prompt,
+        createdAt: Date.now()
+    };
+
+    const assistantMsg: Message = {
+        id: `asst-temp-${Date.now()}`,
+        role: 'assistant',
+        status: 'thinking',
+        content: '',
+        createdAt: Date.now(),
+        toolEvents: []
+    };
+
+    setMessages([userMsg, assistantMsg]);
+
     try {
       let response;
       
       if (mode === AppMode.CHAT) {
-        // Simple chat - no artifacts, just response
         const chatRes = await api.chat(prompt, executor);
-        setTranscript([{
-          type: 'assistant',
-          message: chatRes.response,
-          ts: Date.now().toString()
-        }]);
+        setMessages(prev => {
+            const newMsgs = JSON.parse(JSON.stringify(prev)) as Message[];
+            const asst = newMsgs.find(m => m.role === 'assistant');
+            if (asst) {
+                asst.status = 'done';
+                asst.content = chatRes.response;
+            }
+            return newMsgs;
+        });
         setStatus(RunStatus.COMPLETED);
         setResult(chatRes.response);
         setIsSending(false);
@@ -144,7 +265,6 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
       }
       
       if (mode === AppMode.RUN) {
-        // Spec: POST /run { prompt, executor, workdir }
         response = await api.startRun({
           prompt,
           executor,
@@ -152,7 +272,6 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
           dry_run: dryRun
         });
       } else {
-        // Spec: POST /loop { task, executor, max_retries, workdir }
         response = await api.startLoop({
           task: prompt,
           executor,
@@ -162,14 +281,24 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
         });
       }
 
-      setRunId(response.run_id);
+      const newRunId = response.run_id;
+      setRunId(newRunId);
       setStatus(RunStatus.RUNNING);
       
+      setMessages(prev => prev.map(m => {
+          if (m.id.startsWith('asst-temp')) return { ...m, id: `asst-${newRunId}` };
+          return m;
+      }));
+
       if (onRunCreated) onRunCreated();
-      startStreaming(response.run_id);
+      startStreaming(newRunId);
     } catch (err: any) {
       setError(err.message || 'Failed to start run');
       setStatus(RunStatus.FAILED);
+      setMessages(prev => prev.map(m => {
+          if (m.role === 'assistant') return { ...m, status: 'error', content: 'Failed to start.' };
+          return m;
+      }));
     } finally {
       setIsSending(false);
     }
@@ -180,7 +309,6 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
       setIsCancelling(true);
       try {
           await api.cancelRun(runId);
-          // Don't reset immediately, let polling/SSE catch the status change
           setStatus('cancelling');
       } catch (e) {
           console.error("Cancel failed", e);
@@ -189,40 +317,32 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
 
   const startStreaming = (id: string) => {
     stopStreaming(); 
-    
-    // NOTE: EventSource does not support headers. 
-    // If auth is enabled later, we must use polling or a fetch-based stream reader.
-    // For now, if API key is present in settings (even if not sent), we might prefer polling 
-    // to be safe, OR we assume the SSE endpoint doesn't need auth yet (as per prompt).
-    // Spec says: "GET /runs/{run_id}/stream using EventSource".
-    // Fallback: "Poll every 1s if SSE fails".
-
     const streamUrl = api.getStreamUrl(id);
     
     try {
       const es = new EventSource(streamUrl);
       eventSourceRef.current = es;
 
-      es.onopen = () => {
-        console.log("SSE Connected");
-      };
+      es.onopen = () => console.log("SSE Connected");
 
       es.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          setTranscript((prev) => [...prev, data]);
           
-          // Optionally update status if event contains it, though usually we poll for definitive status
-          if (data.type === 'status') {
-             setStatus(data.message); 
+          if (data.type === 'run_state') {
+              setStatus(data.data?.state || 'running');
+          } else if (data.type === 'status') {
+              setStatus(data.message);
           }
+
+          setMessages(prev => processEvents([data], prev, id));
+
         } catch (e) {
           console.warn("Error parsing SSE data", event.data);
         }
       };
 
       es.onerror = (err) => {
-        // If SSE fails (e.g. 404 or connection error), fall back to polling
         console.warn("SSE Error, switching to polling", err);
         es.close();
         eventSourceRef.current = null;
@@ -242,10 +362,13 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
       try {
         const details = await api.getRun(id);
         
-        // Update transcript (deduplication logic might be needed if mixing SSE and polling, 
-        // but simple replacement is safer for polling fallback)
         if (details.events) {
-            setTranscript(details.events);
+            const reconstructed = processEvents(details.events, [], id);
+            const localUser = messages.find(m => m.role === 'user');
+            if (localUser && !reconstructed.find(m => m.role === 'user')) {
+                reconstructed.unshift(localUser);
+            }
+            setMessages(reconstructed);
         }
         
         const currentStatus = details.meta?.status || 'unknown';
@@ -256,8 +379,14 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
 
         const s = currentStatus.toLowerCase();
         if (s === 'completed' || s === 'failed' || s === 'cancelled') {
-          stopStreaming(); // Clear the interval
+          stopStreaming();
           setIsCancelling(false);
+           setMessages(prev => {
+             const newMsgs = JSON.parse(JSON.stringify(prev)) as Message[];
+             const asst = newMsgs.find(m => m.role === 'assistant');
+             if (asst && asst.status !== 'done' && asst.status !== 'error') asst.status = s === 'failed' ? 'error' : 'done';
+             return newMsgs;
+         });
         }
       } catch (err) {
         console.error("Polling error", err);
@@ -265,7 +394,22 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
     };
     
     check();
-    pollingRef.current = setInterval(check, 1000); // Poll every 1s
+    pollingRef.current = setInterval(check, 1000);
+  };
+
+  const handleScroll = () => {
+      if (scrollContainerRef.current) {
+          const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+          const isBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < 50;
+          setIsAtBottom(isBottom);
+      }
+  };
+
+  const scrollToBottom = () => {
+      if (chatBottomRef.current) {
+          chatBottomRef.current.scrollIntoView({ behavior: 'smooth' });
+          setIsAtBottom(true); // Manually set to true to resume auto-scroll
+      }
   };
 
   // --- Rendering Helpers ---
@@ -296,29 +440,12 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
       icon = <Loader2 size={14} className="animate-spin" />;
       label = "Initiating...";
     } else {
-      // Granular Running States
       color = "bg-purple-500/10 text-purple-300 border border-purple-500/20 shadow-[0_0_15px_rgba(168,85,247,0.15)]";
-      
-      if (s.includes('planning')) {
-         label = "Planning...";
-         icon = <Map size={14} />;
-      } else if (s.includes('executing')) {
-         label = "Executing...";
-         icon = <Terminal size={14} />;
-      } else if (s.includes('reviewing')) {
-         label = "Reviewing...";
-         icon = <Eye size={14} />;
-      } else if (s.includes('auditing')) {
-         label = "Auditing...";
-         icon = <Shield size={14} />;
-      } else if (s.includes('retrying')) {
-          label = "Retrying...";
-          icon = <Repeat size={14} className="animate-spin-slow" />;
-      } else {
-          // Generic running
-          label = "Running...";
-          icon = <Cpu size={14} className="animate-pulse" />;
-      }
+      if (s.includes('planning')) { label = "Planning..."; icon = <Map size={14} />; }
+      else if (s.includes('executing')) { label = "Executing..."; icon = <Terminal size={14} />; }
+      else if (s.includes('reviewing')) { label = "Reviewing..."; icon = <Eye size={14} />; }
+      else if (s.includes('auditing')) { label = "Auditing..."; icon = <Shield size={14} />; }
+      else { label = "Running..."; icon = <Cpu size={14} className="animate-pulse" />; }
     }
 
     return (
@@ -330,7 +457,7 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
   };
 
   return (
-    <div className="flex flex-col h-full bg-transparent">
+    <div className="flex flex-col h-full bg-transparent relative">
       
       {/* 1. Header Area */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-black/20 backdrop-blur-md z-10">
@@ -349,25 +476,15 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
         </div>
       </div>
 
-      {/* 2. Main Chat / Transcript Area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-8 scroll-smooth custom-scrollbar">
+      {/* 2. Main Chat Area */}
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-6 space-y-8 scroll-smooth custom-scrollbar relative"
+      >
         
-        {/* User Prompt Bubble */}
-        {(prompt || initialRunId) && (runId || transcript.length > 0) && (
-            <div className="flex justify-end">
-                <div className="max-w-[80%] bg-gradient-to-br from-pink-600 to-purple-700 text-white px-5 py-4 rounded-2xl rounded-tr-sm shadow-xl shadow-purple-900/20 border border-white/10">
-                    <div className="text-xs text-pink-200 mb-1 font-bold uppercase opacity-80 tracking-wide">
-                        {mode === AppMode.LOOP ? 'Task' : 'Prompt'}
-                    </div>
-                    <div className="whitespace-pre-wrap leading-relaxed">
-                        {prompt || (transcript.find(e => e.type === 'user_prompt')?.message) || 'Run started...'}
-                    </div>
-                </div>
-            </div>
-        )}
-
         {/* Empty State */}
-        {!runId && transcript.length === 0 && !isSending && (
+        {!runId && messages.length === 0 && !isSending && (
           <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-80 pb-20">
              <div className="w-32 h-32 mb-6 relative">
                  <div className="absolute inset-0 bg-purple-500/20 blur-3xl rounded-full"></div>
@@ -380,49 +497,47 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
           </div>
         )}
 
-        {/* System/Agent Events */}
-        <div className="space-y-4">
-            {transcript.map((event, idx) => {
-                if (!event.message) return null;
-                
-                return (
-                    <div key={idx} className="flex gap-4 max-w-[90%] animate-in fade-in slide-in-from-bottom-2 duration-300 group">
-                         <div className="flex-shrink-0 mt-1">
+        {/* Message Stream */}
+        {messages.map((msg) => (
+            <div key={msg.id} className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                {msg.role === 'user' ? (
+                    <div className="flex justify-end">
+                        <div className="max-w-[80%] bg-gradient-to-br from-pink-600 to-purple-700 text-white px-5 py-4 rounded-2xl rounded-tr-sm shadow-xl shadow-purple-900/20 border border-white/10">
+                            <div className="text-xs text-pink-200 mb-1 font-bold uppercase opacity-80 tracking-wide">
+                                You
+                            </div>
+                            <div className="whitespace-pre-wrap leading-relaxed">
+                                {msg.content}
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex gap-4 max-w-[90%]">
+                        <div className="flex-shrink-0 mt-1">
                              <div className="w-10 h-10 rounded-xl bg-black/40 flex items-center justify-center border border-white/10 shadow-lg overflow-hidden">
-                              {event.type === 'error' 
-                                     ? <AlertCircle size={20} className="text-red-400"/> 
-                                     : <Sparkles size={20} className="text-purple-400" />
-                                  }
+                                  <Sparkles size={20} className="text-purple-400" />
                              </div>
-                         </div>
-                         <div className="flex-1 space-y-1.5">
-                             <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-purple-300 uppercase tracking-wider">{event.type || 'System'}</span>
-                                <span className="text-[10px] text-slate-500 font-mono">{event.ts ? new Date(event.ts).toLocaleTimeString() : ''}</span>
-                             </div>
+                        </div>
+                        <div className="flex-1 space-y-4">
+                             {/* Thinking Bubble */}
+                             {msg.status === 'thinking' && <ThinkingBubble />}
                              
-                             <div className={`text-sm leading-relaxed p-4 rounded-2xl rounded-tl-sm border shadow-sm backdrop-blur-sm ${
-                                 event.type === 'error' ? 'bg-red-950/30 border-red-500/30 text-red-200' : 
-                                 'bg-[#1a162e]/80 border-white/5 text-slate-200 group-hover:bg-[#1f1b35] transition-colors'
-                             }`}>
-                                 <pre className="whitespace-pre-wrap font-sans">{event.message}</pre>
-                             </div>
-                         </div>
+                             {/* Content */}
+                             {msg.content && (
+                                 <div className="text-sm leading-relaxed p-4 rounded-2xl rounded-tl-sm border shadow-sm backdrop-blur-sm bg-[#1a162e]/80 border-white/5 text-slate-200">
+                                     <pre className="whitespace-pre-wrap font-sans">{msg.content}</pre>
+                                 </div>
+                             )}
+
+                             {/* Tool Cards */}
+                             {msg.toolEvents?.map(tool => (
+                                 <ToolCard key={tool.id} tool={tool} />
+                             ))}
+                        </div>
                     </div>
-                )
-            })}
-            
-            {/* Loading Indicator for stream */}
-            {(status.toLowerCase() !== 'completed' && status.toLowerCase() !== 'failed' && status.toLowerCase() !== 'idle' && status.toLowerCase() !== 'cancelled') && (
-                <div className="flex gap-4 max-w-[90%]">
-                    <div className="w-10 h-10 flex-shrink-0" />
-                    <div className="flex items-center gap-2 text-purple-400/70 text-sm bg-purple-900/10 px-3 py-1.5 rounded-full border border-purple-500/10">
-                        <Loader2 size={14} className="animate-spin" />
-                        <span>{status.includes('running') ? 'Thinking...' : status}</span>
-                    </div>
-                </div>
-            )}
-        </div>
+                )}
+            </div>
+        ))}
 
         {/* Final Result Block */}
         {result && (
@@ -452,6 +567,17 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
 
         <div ref={chatBottomRef} />
       </div>
+
+      {/* Jump to Bottom Button */}
+      {!isAtBottom && (
+          <button
+            onClick={scrollToBottom}
+            className="absolute bottom-32 right-8 z-30 p-2 rounded-full bg-purple-600/80 hover:bg-purple-600 text-white shadow-lg backdrop-blur-sm transition-all animate-in fade-in zoom-in-95"
+            title="Jump to latest"
+          >
+              <ArrowDown size={20} />
+          </button>
+      )}
 
       {/* 3. Input Area */}
       <div className="p-6 z-20">

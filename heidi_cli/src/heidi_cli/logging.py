@@ -106,6 +106,33 @@ class HeidiLogger:
         cls.info(f"[RESULT] {result}")
 
     @classmethod
+    def emit_message_delta(cls, delta: str) -> None:
+        cls.write_event("message_delta", {"deltaText": delta})
+
+    @classmethod
+    def emit_tool_start(cls, title: str) -> str:
+        tool_id = str(uuid.uuid4())[:8]
+        cls.write_event("tool_start", {"tool_id": tool_id, "title": title})
+        return tool_id
+
+    @classmethod
+    def emit_tool_log(cls, tool_id: str, line: str) -> None:
+        cls.write_event("tool_log", {"tool_id": tool_id, "line": line})
+
+    @classmethod
+    def emit_tool_done(cls, tool_id: str) -> None:
+        cls.write_event("tool_done", {"tool_id": tool_id})
+
+    @classmethod
+    def emit_tool_error(cls, tool_id: str, error: str) -> None:
+        cls.write_event("tool_error", {"tool_id": tool_id, "error": error})
+
+    @classmethod
+    def emit_run_state(cls, state: str) -> None:
+        if cls._run_id:
+            cls.write_event("run_state", {"run_id": cls._run_id, "state": state})
+
+    @classmethod
     def write_event(cls, event_type: str, data: dict[str, Any]) -> None:
         if not cls._run_dir:
             return

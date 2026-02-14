@@ -40,9 +40,10 @@ export interface RunResponse {
 
 export interface RunEvent {
   type: string;
-  message: string;
+  message?: string; // Legacy field for simple logs
   ts: string;
-  details?: any;
+  data?: any; // New field for structured data
+  details?: any; // Legacy field
 }
 
 export interface RunDetails {
@@ -76,4 +77,25 @@ export enum AppMode {
 export interface SettingsState {
   baseUrl: string;
   apiKey: string;
+}
+
+// --- New Types for Streaming UI ---
+
+export type MessageStatus = "queued" | "thinking" | "streaming" | "done" | "error";
+
+export interface ToolEvent {
+  id: string;
+  title: string;
+  status: "running" | "done" | "error";
+  lines: string[];
+  updatedAt: number;
+}
+
+export interface Message {
+  id: string;
+  role: "user" | "assistant" | "system";
+  status: MessageStatus;
+  content: string;
+  createdAt: number;
+  toolEvents?: ToolEvent[];
 }

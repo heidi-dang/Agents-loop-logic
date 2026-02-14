@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Callable
 
 from ..copilot_runtime import CopilotRuntime
 
@@ -20,7 +20,9 @@ class ExecResult:
 
 
 class BaseExecutor:
-    async def run(self, prompt: str, workdir: Path) -> ExecResult:
+    async def run(
+        self, prompt: str, workdir: Path, on_chunk: Optional[Callable[[str], None]] = None
+    ) -> ExecResult:
         raise NotImplementedError
 
 
@@ -29,11 +31,13 @@ class CopilotExecutor(BaseExecutor):
         self.model = model
         self.cwd = cwd
 
-    async def run(self, prompt: str, workdir: Path) -> ExecResult:
+    async def run(
+        self, prompt: str, workdir: Path, on_chunk: Optional[Callable[[str], None]] = None
+    ) -> ExecResult:
         rt = CopilotRuntime(model=self.model, cwd=workdir or self.cwd)
         await rt.start()
         try:
-            text = await rt.send_and_wait(f"WORKDIR: {workdir}\n\n{prompt}")
+            text = await rt.send_and_wait(f"WORKDIR: {workdir}\n\n{prompt}", on_chunk=on_chunk)
             return ExecResult(ok=True, output=text)
         except Exception as e:
             return ExecResult(ok=False, output=str(e))
@@ -45,7 +49,9 @@ class SubprocessExecutor(BaseExecutor):
     def __init__(self, cmd_prefix: list[str]):
         self.cmd_prefix = cmd_prefix
 
-    async def run(self, prompt: str, workdir: Path) -> ExecResult:
+    async def run(
+        self, prompt: str, workdir: Path, on_chunk: Optional[Callable[[str], None]] = None
+    ) -> ExecResult:
         cmd = self.cmd_prefix + [prompt]
         proc = await asyncio.create_subprocess_exec(
             *cmd,
@@ -73,7 +79,9 @@ class VscodeExecutor(BaseExecutor):
         self.host = host
         self.port = port
 
-    async def run(self, prompt: str, workdir: Path) -> ExecResult:
+    async def run(
+        self, prompt: str, workdir: Path, on_chunk: Optional[Callable[[str], None]] = None
+    ) -> ExecResult:
         try:
             proc = await asyncio.create_subprocess_exec(
                 "code",
@@ -98,7 +106,9 @@ class OllamaExecutor(BaseExecutor):
         self.model = model
         self.url = url
 
-    async def run(self, prompt: str, workdir: Path) -> ExecResult:
+    async def run(
+        self, prompt: str, workdir: Path, on_chunk: Optional[Callable[[str], None]] = None
+    ) -> ExecResult:
         import aiohttp
 
         try:
@@ -122,7 +132,9 @@ class LMStudioExecutor(BaseExecutor):
         self.model = model
         self.url = url
 
-    async def run(self, prompt: str, workdir: Path) -> ExecResult:
+    async def run(
+        self, prompt: str, workdir: Path, on_chunk: Optional[Callable[[str], None]] = None
+    ) -> ExecResult:
         import aiohttp
 
         try:
