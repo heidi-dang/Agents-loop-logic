@@ -24,25 +24,20 @@ HEIDI_API_KEY = os.getenv("HEIDI_API_KEY", "").strip()
 
 # CORS allowlist:
 # - If HEIDI_CORS_ORIGINS is set (comma-separated), it overrides everything.
-# - Otherwise:
-#     - If auth enabled -> default to localhost UI
-#     - If auth disabled -> allow all (current behavior for local dev)
+# - Otherwise defaults to localhost UI origins for development.
+# Note: With credentials (cookies), browsers reject wildcard "*" origins.
 _cors_env = os.getenv("HEIDI_CORS_ORIGINS", "").strip()
 if _cors_env:
     ALLOW_ORIGINS = [o.strip() for o in _cors_env.split(",") if o.strip()]
 else:
-    ALLOW_ORIGINS = (
-        [
-            "http://localhost:3002",
-            "http://127.0.0.1:3002",
-            "http://localhost:3001",
-            "http://127.0.0.1:3001",
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-        ]
-        if HEIDI_API_KEY
-        else ["*"]
-    )
+    ALLOW_ORIGINS = [
+        "http://localhost:3002",
+        "http://127.0.0.1:3002",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
 
 app = FastAPI(title="Heidi CLI Server")
 
@@ -62,12 +57,26 @@ app.add_middleware(AuthMiddleware)
 init_db()
 
 
+def _check_auth(request: Request, stream_key: Optional[str] = None) -> bool:
+    """Check if request is authorized via session OR API key.
+
+    Returns True if authorized, False otherwise.
+    """
+    if hasattr(request.state, "user") and request.state.user is not None:
+        return True
+
+    if not HEIDI_API_KEY:
+        return False
+
+    header_key = request.headers.get("x-heidi-key", "")
+    effective = (header_key or stream_key or "").strip()
+    return bool(effective and effective == HEIDI_API_KEY)
+
+
 def _require_api_key(request: Request, stream_key: Optional[str] = None) -> None:
     if not HEIDI_API_KEY:
         return
-    header_key = request.headers.get("x-heidi-key", "")
-    effective = (header_key or stream_key or "").strip()
-    if not effective or effective != HEIDI_API_KEY:
+    if not _check_auth(request, stream_key):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
@@ -98,14 +107,12 @@ async def serve_ui(path: str):
             status_code=200,
         )
 
-    from fastapi.staticfiles import StaticFiles
-
-    # Let StaticFiles handle the file serving
     file_path = UI_DIST / path
     if file_path.is_file():
-        return StaticFiles(directory=str(UI_DIST)).get_path(path)
+        from starlette.responses import FileResponse
 
-    # For SPA, serve index.html for non-file paths
+        return FileResponse(file_path)
+
     index_path = UI_DIST / "index.html"
     if index_path.exists():
         return HTMLResponse(index_path.read_text())
@@ -392,3 +399,117 @@ async def auth_status(request: Request):
         if request.state.user
         else None,
     }
+
+
+# UI calls /api/* only - add aliases for OpenCode endpoints
+@app.get("/api/connect/opencode/openai/status")
+async def api_opencode_openai_status():
+    """Alias for /connect/opencode/openai/status (UI compatibility)."""
+    return await opencode_openai_status()
+
+
+@app.post("/api/connect/opencode/openai/test")
+async def api_opencode_openai_test():
+    """Alias for /connect/opencode/openai/test (UI compatibility)."""
+    return await opencode_openai_test()
+
+
+@app.get("/connect/opencode/openai/status")
+async def opencode_openai_status():
+    """Check OpenCode OpenAI connection status for UI."""
+    import os
+    import shutil
+    from pathlib import Path
+
+    opencode_path = shutil.which("opencode")
+    if not opencode_path:
+        return {
+            "connected": False,
+            "error": "OpenCode CLI not installed",
+            "authPath": None,
+            "models": [],
+        }
+
+    if os.name == "nt":
+        user_profile = os.environ.get("USERPROFILE", "")
+        auth_path = Path(user_profile) / ".local" / "share" / "opencode" / "auth.json"
+    else:
+        auth_path = Path.home() / ".local" / "share" / "opencode" / "auth.json"
+
+    if not auth_path.exists():
+        return {
+            "connected": False,
+            "error": "OpenCode auth not found. Run 'heidi connect opencode openai'",
+            "authPath": str(auth_path),
+            "models": [],
+        }
+
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["opencode", "models", "openai"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            lines = result.stdout.strip().split("\n")
+            models = [line.strip() for line in lines if line.strip()]
+            return {
+                "connected": True,
+                "error": None,
+                "authPath": str(auth_path),
+                "models": models,
+            }
+        return {
+            "connected": False,
+            "error": "OpenAI not connected",
+            "authPath": str(auth_path),
+            "models": [],
+        }
+    except Exception as e:
+        return {
+            "connected": False,
+            "error": str(e),
+            "authPath": str(auth_path),
+            "models": [],
+        }
+
+
+@app.post("/connect/opencode/openai/test")
+async def opencode_openai_test():
+    """Test OpenCode OpenAI connection."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["opencode", "models", "openai"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            return {"pass": False, "error": "No OpenAI models", "output": ""}
+
+        lines = result.stdout.strip().split("\n")
+        models = [line.strip() for line in lines if line.strip()]
+        if not models:
+            return {"pass": False, "error": "No models", "output": ""}
+
+        first_model = models[0]
+    except Exception as e:
+        return {"pass": False, "error": str(e), "output": ""}
+
+    try:
+        result = subprocess.run(
+            ["opencode", "run", "say ok", f"--model=openai/{first_model.split('/')[-1]}"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode == 0:
+            return {"pass": True, "error": None, "output": result.stdout[:500]}
+        return {"pass": False, "error": result.stderr[:200], "output": ""}
+    except Exception as e:
+        return {"pass": False, "error": str(e), "output": ""}
