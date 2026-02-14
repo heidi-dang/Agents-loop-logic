@@ -14,6 +14,8 @@ import uvicorn
 
 from .auth_db import init_db
 from .auth_middleware import AuthMiddleware
+from .orchestrator.planner import PlannerAgent
+from .orchestrator.session import Session, SessionState
 
 # Optional API key protection:
 # - If HEIDI_API_KEY is set, protected endpoints require:
@@ -85,6 +87,19 @@ app.add_middleware(
 app.add_middleware(AuthMiddleware)
 
 init_db()
+
+# Global Session Manager
+ACTIVE_SESSIONS: dict[str, PlannerAgent] = {}
+
+
+def get_planner(session_id: str = "default") -> PlannerAgent:
+    if session_id not in ACTIVE_SESSIONS:
+        session = Session.load(session_id)
+        if not session:
+            session = Session(session_id=session_id)
+            session.save()
+        ACTIVE_SESSIONS[session_id] = PlannerAgent(session)
+    return ACTIVE_SESSIONS[session_id]
 
 
 def _check_auth(request: Request, stream_key: Optional[str] = None) -> bool:
@@ -346,15 +361,73 @@ class ChatResponse(BaseModel):
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, http_request: Request):
-    """Simple chat endpoint - no artifacts, no planning, just response."""
-    from .orchestrator.loop import pick_executor
-
+    """Stateful chat endpoint using PlannerAgent."""
     try:
-        executor = pick_executor(request.executor)
-        result = await executor.run(request.message, Path.cwd())
-        return ChatResponse(response=result.output)
+        # Determine session ID (use user ID if auth enabled, else default)
+        session_id = "default"
+        if hasattr(http_request.state, "user") and http_request.state.user:
+            session_id = http_request.state.user.id
+
+        planner = get_planner(session_id)
+        workdir = Path.cwd()
+        response = await planner.process_user_message(request.message, workdir)
+        return ChatResponse(response=response)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/chat/history")
+async def chat_history(http_request: Request):
+    """Get conversation history for current session."""
+    session_id = "default"
+    if hasattr(http_request.state, "user") and http_request.state.user:
+        session_id = http_request.state.user.id
+
+    planner = get_planner(session_id)
+    return planner.session.history
+
+
+@app.post("/plan/approve")
+async def approve_plan(http_request: Request):
+    """Approve current plan and start execution."""
+    session_id = "default"
+    if hasattr(http_request.state, "user") and http_request.state.user:
+        session_id = http_request.state.user.id
+
+    planner = get_planner(session_id)
+    workdir = Path.cwd()
+    result = await planner.approve_plan(workdir)
+    return {"status": "ok", "message": result}
+
+
+@app.post("/plan/reject")
+async def reject_plan(http_request: Request, reason: str = "Rejected by user"):
+    """Reject current plan."""
+    session_id = "default"
+    if hasattr(http_request.state, "user") and http_request.state.user:
+        session_id = http_request.state.user.id
+
+    planner = get_planner(session_id)
+    workdir = Path.cwd()
+    result = await planner.reject_plan(reason, workdir)
+    return {"status": "ok", "message": result}
+
+
+@app.get("/session")
+async def get_session(http_request: Request):
+    """Get current session state."""
+    session_id = "default"
+    if hasattr(http_request.state, "user") and http_request.state.user:
+        session_id = http_request.state.user.id
+
+    planner = get_planner(session_id)
+    return {
+        "session_id": planner.session.session_id,
+        "state": planner.session.state,
+        "task": planner.session.task,
+        "plan": planner.session.plan,
+        "task_slug": planner.session.task_slug,
+    }
 
 
 @app.post("/run", response_model=RunResponse)
@@ -456,6 +529,31 @@ async def api_loop(request: LoopRequest, http_request: Request):
 @app.post("/api/chat")
 async def api_chat(request: ChatRequest, http_request: Request):
     return await chat(request, http_request)
+
+
+@app.get("/api/chat/history")
+async def api_chat_history(http_request: Request):
+    return await chat_history(http_request)
+
+
+@app.post("/api/plan/approve")
+async def api_approve_plan(http_request: Request):
+    return await approve_plan(http_request)
+
+
+@app.get("/api/tasks/{slug}")
+async def api_get_task_artifacts(slug: str):
+    from .orchestrator.artifacts import TaskArtifact
+
+    artifact = TaskArtifact.load(slug)
+    if not artifact:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {
+        "slug": artifact.slug,
+        "content": artifact.content,
+        "audit": artifact.audit_content,
+        "status": artifact.status,
+    }
 
 
 @app.get("/api/runs")
