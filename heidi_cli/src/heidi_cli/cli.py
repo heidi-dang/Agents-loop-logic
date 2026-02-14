@@ -144,6 +144,8 @@ def paths() -> None:
         heidi_cache_dir,
     )
 
+    ConfigManager.ensure_dirs()
+
     table = Table(title="Heidi CLI Paths")
     table.add_column("Location", style="cyan")
     table.add_column("Path", style="white")
