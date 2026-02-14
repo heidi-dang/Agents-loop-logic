@@ -221,7 +221,6 @@ else
     mkdir -p "$(dirname "$UI_DIR")"
     cp -r "$INSTALL_DIR/ui" "$UI_DIR"
 fi
-fi
 
 # Create global config/state/cache dirs (no secrets) so CI + UX are deterministic
 create_global_dirs() {
