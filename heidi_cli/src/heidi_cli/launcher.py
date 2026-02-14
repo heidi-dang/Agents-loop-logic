@@ -19,12 +19,16 @@ from .config import ConfigManager
 console = Console()
 
 
-def ensure_ui_repo(ui_path: Optional[Path] = None, no_update: bool = False) -> Optional[Path]:
+def ensure_ui_repo(
+    ui_path: Optional[Path] = None, no_update: bool = False, show_sh: bool = False
+) -> Optional[Path]:
     """Ensure UI repo exists and is up-to-date.
 
     If ui_path is None, uses heidi_ui_dir() (default cache location).
     If directory doesn't exist, clones the repo.
     If directory exists, tries to update via git pull.
+
+    If show_sh is True, prints before/after commit SHAs.
 
     Returns the Path to UI directory or None on failure.
     """
@@ -34,6 +38,23 @@ def ensure_ui_repo(ui_path: Optional[Path] = None, no_update: bool = False) -> O
         ui_path = _heidi_ui_dir()
 
     ui_path = Path(ui_path)
+
+    # Get current SHA before update
+    old_sh = None
+    if show_sh and ui_path.exists() and (ui_path / ".git").exists():
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                cwd=str(ui_path),
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                old_sh = result.stdout.strip()
+                console.print(f"[dim]Current UI version: {old_sh}[/dim]")
+        except Exception:
+            pass
 
     if not ui_path.exists():
         console.print(f"[cyan]Cloning UI repo to {ui_path}...[/cyan]")
@@ -111,6 +132,25 @@ def ensure_ui_repo(ui_path: Optional[Path] = None, no_update: bool = False) -> O
             console.print(f"[yellow]Error updating UI: {e}[/yellow]")
     else:
         console.print(f"[yellow]UI path exists but is not a git repo: {ui_path}[/yellow]")
+
+    # Show new SHA after update
+    if show_sh and ui_path.exists() and (ui_path / ".git").exists():
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                cwd=str(ui_path),
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                new_sh = result.stdout.strip()
+                if old_sh and old_sh != new_sh:
+                    console.print(f"[green]UI updated: {old_sh} → {new_sh}[/green]")
+                elif not old_sh:
+                    console.print(f"[green]UI version: {new_sh}[/green]")
+        except Exception:
+            pass
 
     return ui_path if ui_path.exists() else None
 

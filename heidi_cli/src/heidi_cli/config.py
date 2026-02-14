@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import subprocess
 from pathlib import Path
 from typing import Any, Optional
 
@@ -121,6 +122,53 @@ def check_legacy_heidi_dir() -> Optional[Path]:
     return None
 
 
+def detect_install_method() -> tuple[Optional[str], Optional[Path]]:
+    """Detect how Heidi CLI is installed.
+
+    Returns (method, path) tuple:
+    - ("pipx", None)
+    - ("git", /path/to/install)
+    - ("pip", None)
+    - (None, None) if unknown
+    """
+    import shutil
+    import heidi_cli
+
+    # Check pipx
+    if shutil.which("pipx"):
+        # Check if heidi-cli is managed by pipx
+        result = subprocess.run(["pipx", "list"], capture_output=True, text=True)
+        if "heidi-cli" in result.stdout:
+            return ("pipx", None)
+
+    # Check git checkout
+    cli_path = Path(heidi_cli.__file__).parent
+    if (cli_path.parent / ".git").exists():
+        return ("git", cli_path.parent)
+
+    # Check pip
+    if shutil.which("pip") or shutil.which("pip3"):
+        return ("pip", None)
+
+    return (None, None)
+
+
+def ensure_install_metadata() -> None:
+    """Ensure install metadata is stored in config."""
+    config = ConfigManager.load_config()
+    if config.install_method is None:
+        method, path = detect_install_method()
+        if method:
+            config.install_method = method
+            if path:
+                config.install_dir = str(path)
+            config.ui_dir = str(heidi_ui_dir())
+            from datetime import datetime
+
+            config.installed_at = datetime.now().isoformat()
+            ConfigManager.save_config(config)
+
+
 class HeidiConfig(BaseModel):
     version: str = "0.1.0"
     executor_default: str = "copilot"
@@ -138,6 +186,11 @@ class HeidiConfig(BaseModel):
     ollama_url: str = "http://localhost:11434"
     lmstudio_url: str = "http://localhost:1234"
     persona: str = "default"
+    # Install metadata
+    install_method: Optional[str] = None
+    install_dir: Optional[str] = None
+    ui_dir: Optional[str] = None
+    installed_at: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(exclude_none=True)

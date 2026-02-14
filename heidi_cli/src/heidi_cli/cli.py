@@ -210,15 +210,18 @@ def update(
     no_ui: bool = typer.Option(False, "--no-ui", help="Skip UI update"),
 ) -> None:
     """Update UI and optional components to latest version."""
-    from .config import heidi_ui_dir
+    from .config import heidi_ui_dir, ensure_install_metadata
     from .launcher import ensure_ui_repo
+
+    # Ensure install metadata is recorded
+    ensure_install_metadata()
 
     console.print("[cyan]Running heidi update...[/cyan]")
 
     if not no_ui:
         console.print("\n[cyan]Updating UI...[/cyan]")
         ui_dir = heidi_ui_dir()
-        ensure_ui_repo(ui_dir, no_update=False)
+        ensure_ui_repo(ui_dir, no_update=False, show_sh=True)
     else:
         console.print("[dim]Skipping UI update (--no-ui)[/dim]")
 
@@ -288,10 +291,22 @@ def upgrade() -> None:
 @app.command()
 def uninstall(
     purge: bool = typer.Option(False, "--purge", help="Also remove all config, state, and cache"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ) -> None:
     """Uninstall Heidi CLI."""
     import shutil as _shutil
     from .config import heidi_config_dir, heidi_state_dir, heidi_cache_dir, heidi_ui_dir
+
+    if not yes:
+        console.print("[yellow]This will uninstall Heidi CLI.[/yellow]")
+        if not purge:
+            console.print(
+                "[dim]Config/state/cache will be kept. Use --purge to remove everything.[/dim]"
+            )
+        confirm = input("Continue? [y/N]: ")
+        if confirm.lower() not in ("y", "yes"):
+            console.print("[yellow]Cancelled.[/yellow]")
+            raise typer.Exit(0)
 
     if not purge:
         console.print("[yellow]This will remove Heidi CLI but keep config/state/cache.[/yellow]")
