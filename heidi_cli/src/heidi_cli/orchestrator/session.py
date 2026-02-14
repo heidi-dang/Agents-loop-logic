@@ -9,9 +9,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, List, Any
 
-from ..logging import HeidiLogger, redact_secrets
+from ..logging import redact_secrets
 from ..config import ConfigManager
-from .executors import pick_executor, ExecResult
+from .executors import pick_executor
 from .plan import build_plan_prompt, extract_routing, parse_routing
 from .registry import AgentRegistry
 from .artifacts import TaskArtifact, sanitize_slug, save_audit_to_task, parse_audit_decision
@@ -312,7 +312,8 @@ IMPORTANT: When done, output DEV_COMPLETION block with:
 
                     for reviewer in reviewers:
                         reviewer_agent = AgentRegistry.get(reviewer)
-                        if not reviewer_agent: continue
+                        if not reviewer_agent:
+                            continue
 
                         audit_prompt = f"""{reviewer_agent["prompt"]}
 Task: {self.state.task}

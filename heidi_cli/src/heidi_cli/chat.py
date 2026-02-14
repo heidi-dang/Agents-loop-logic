@@ -1,18 +1,15 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import os
-import sys
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt
 
-from .logging import redact_secrets
 from .orchestrator.executors import pick_executor, ExecResult
 from .config import ConfigManager
 
@@ -121,7 +118,7 @@ async def start_chat_repl(executor_name: str, model: Optional[str] = None, reset
 
     while True:
         try:
-            user_input = Prompt.ask(f"[bold green]You[/bold green]")
+            user_input = Prompt.ask("[bold green]You[/bold green]")
 
             if not user_input.strip():
                 continue
