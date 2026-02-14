@@ -609,7 +609,7 @@ async def chat_completions(request: ChatCompletionRequest, http_request: Request
                             await asyncio.wait_for(done.wait(), timeout=300)
                         except asyncio.TimeoutError:
                             pass
-                        yield f"data: [DONE]\n\n"
+                        yield "data: [DONE]\n\n"
                     finally:
                         await rt.stop()
                 else:
@@ -625,7 +625,7 @@ async def chat_completions(request: ChatCompletionRequest, http_request: Request
                         ],
                     }
                     yield f"data: {json.dumps(chunk)}\n\n"
-                    yield f"data: [DONE]\n\n"
+                    yield "data: [DONE]\n\n"
             except Exception as e:
                 yield f"data: {json.dumps({'error': {'message': str(e)}})}\n\n"
 
