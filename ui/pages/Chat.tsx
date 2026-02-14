@@ -3,7 +3,7 @@ import { api, getSettings } from '../api/heidi';
 import { Agent, AppMode, RunEvent, RunStatus } from '../types';
 import { 
   Send, Repeat, StopCircle, CheckCircle, AlertCircle, Loader2, PlayCircle, PanelLeft,
-  Sparkles, Cpu, Search, Map, Terminal, Eye, Shield
+  Sparkles, Cpu, Search, Map, Terminal, Eye, Shield, MessageSquare
 } from 'lucide-react';
 
 interface ChatProps {
@@ -16,7 +16,7 @@ interface ChatProps {
 const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, onToggleSidebar }) => {
   // Config State
   const [prompt, setPrompt] = useState('');
-  const [mode, setMode] = useState<AppMode>(AppMode.RUN); // Default to RUN
+  const [mode, setMode] = useState<AppMode>(AppMode.CHAT); // Default to CHAT
   const [executor, setExecutor] = useState('copilot');
   const [maxRetries, setMaxRetries] = useState(2);
   const [dryRun, setDryRun] = useState(false);
@@ -125,6 +125,21 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
 
     try {
       let response;
+      
+      if (mode === AppMode.CHAT) {
+        // Simple chat - no artifacts, just response
+        const chatRes = await api.chat(prompt, executor);
+        setTranscript([{
+          type: 'assistant',
+          content: chatRes.response,
+          timestamp: Date.now()
+        }]);
+        setStatus(RunStatus.COMPLETED);
+        setResult(chatRes.response);
+        setIsSending(false);
+        return;
+      }
+      
       if (mode === AppMode.RUN) {
         // Spec: POST /run { prompt, executor, workdir }
         response = await api.startRun({
@@ -444,6 +459,12 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
                 <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400 p-1">
                     {/* Mode Toggle */}
                     <div className="flex bg-black/40 rounded-lg p-1 border border-white/5">
+                        <button 
+                            onClick={() => setMode(AppMode.CHAT)}
+                            className={`px-4 py-1.5 rounded-md transition-all font-medium ${mode === AppMode.CHAT ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'hover:text-white hover:bg-white/5'}`}
+                        >
+                            <span className="flex items-center gap-1.5"><MessageSquare size={14} /> Chat</span>
+                        </button>
                         <button 
                             onClick={() => setMode(AppMode.RUN)}
                             className={`px-4 py-1.5 rounded-md transition-all font-medium ${mode === AppMode.RUN ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50' : 'hover:text-white hover:bg-white/5'}`}

@@ -1,6 +1,6 @@
 import { Agent, LoopRequest, RunDetails, RunRequest, RunResponse, RunSummary, SettingsState } from '../types';
 
-const DEFAULT_BASE_URL = 'http://localhost:7777';
+const DEFAULT_BASE_URL = '/api';
 
 export const getSettings = (): SettingsState => {
   return {
@@ -99,6 +99,19 @@ export const api = {
     if (!res.ok) {
       const errText = await res.text();
       throw new Error(`Failed to start loop: ${errText}`);
+    }
+    return res.json();
+  },
+
+  chat: async (message: string, executor: string = 'copilot'): Promise<{ response: string }> => {
+    const res = await fetch(`${getBaseUrl()}/chat`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ message, executor }),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Chat failed: ${errText}`);
     }
     return res.json();
   },

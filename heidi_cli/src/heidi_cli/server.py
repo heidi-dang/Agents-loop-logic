@@ -252,6 +252,28 @@ class RunResponse(BaseModel):
     error: Optional[str] = None
 
 
+class ChatRequest(BaseModel):
+    message: str
+    executor: str = "copilot"
+
+
+class ChatResponse(BaseModel):
+    response: str
+
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest, http_request: Request):
+    """Simple chat endpoint - no artifacts, no planning, just response."""
+    from .orchestrator.loop import pick_executor
+
+    try:
+        executor = pick_executor(request.executor)
+        result = await executor.run(request.message, Path.cwd())
+        return ChatResponse(response=result.output)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/run", response_model=RunResponse)
 async def run(request: RunRequest, http_request: Request):
     _require_api_key(http_request)

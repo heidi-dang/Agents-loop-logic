@@ -68,6 +68,7 @@ export interface RunSummary {
 }
 
 export enum AppMode {
+  CHAT = 'chat',
   RUN = 'run',
   LOOP = 'loop',
 }
