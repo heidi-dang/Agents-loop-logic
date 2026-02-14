@@ -353,7 +353,9 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
           <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-80 pb-20">
              <div className="w-32 h-32 mb-6 relative">
                  <div className="absolute inset-0 bg-purple-500/20 blur-3xl rounded-full"></div>
-                 <img src="/heidiai_logo.png" className="relative w-full h-full object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-500" alt="Heidi AI" />
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    <Sparkles className="w-16 h-16 text-purple-400" />
+                  </div>
              </div>
             <h2 className="mt-4 text-3xl font-bold text-white tracking-tight">How can I help you?</h2>
             <p className="text-slate-400 mt-2">Configure your agent below and start a new run.</p>
@@ -369,10 +371,10 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
                     <div key={idx} className="flex gap-4 max-w-[90%] animate-in fade-in slide-in-from-bottom-2 duration-300 group">
                          <div className="flex-shrink-0 mt-1">
                              <div className="w-10 h-10 rounded-xl bg-black/40 flex items-center justify-center border border-white/10 shadow-lg overflow-hidden">
-                                 {event.type === 'error' 
-                                    ? <AlertCircle size={20} className="text-red-400"/> 
-                                    : <img src="/heidiai_logo.png" className="w-7 h-7 object-contain opacity-90" alt="AI" />
-                                 }
+                              {event.type === 'error' 
+                                     ? <AlertCircle size={20} className="text-red-400"/> 
+                                     : <Sparkles size={20} className="text-purple-400" />
+                                  }
                              </div>
                          </div>
                          <div className="flex-1 space-y-1.5">

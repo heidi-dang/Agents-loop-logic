@@ -50,8 +50,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onSelectRun,
       {/* Header */}
       <div className="p-4 border-b border-white/10 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-9 h-9 relative flex-shrink-0 flex items-center justify-center bg-gradient-to-tr from-pink-500 to-purple-600 rounded-xl shadow-lg shadow-purple-900/50 p-0.5">
-            <img src="/heidiai_logo.png" alt="Heidi AI" className="w-full h-full object-cover rounded-[10px]" />
+            <div className="w-9 h-9 relative flex-shrink-0 flex items-center justify-center bg-gradient-to-tr from-pink-500 to-purple-600 rounded-xl shadow-lg shadow-purple-900/50">
+            <Sparkles size={20} className="text-white" />
             </div>
             <span className="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-pink-300 to-purple-300 drop-shadow-sm whitespace-nowrap">
             Heidi AI
