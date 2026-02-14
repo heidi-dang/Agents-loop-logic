@@ -1,7 +1,23 @@
 
+import sys
 import pytest
 from pathlib import Path
-from fastapi.testclient import TestClient
+
+# Debugging imports for CI failure diagnosis
+try:
+    import pydantic
+    print(f"DEBUG: pydantic: {pydantic}")
+    print(f"DEBUG: pydantic file: {getattr(pydantic, '__file__', 'unknown')}")
+    print(f"DEBUG: pydantic path: {getattr(pydantic, '__path__', 'unknown')}")
+except ImportError:
+    print("DEBUG: pydantic not found")
+
+try:
+    from fastapi.testclient import TestClient
+except ImportError as e:
+    print(f"DEBUG: Failed to import TestClient: {e}")
+    raise
+
 from unittest.mock import patch
 from heidi_cli.server import app
 
