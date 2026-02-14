@@ -131,6 +131,18 @@ async def list_agents():
     return [{"name": name, "description": desc} for name, desc in agents]
 
 
+@app.get("/models")
+async def list_models():
+    """List available Copilot models."""
+    from .copilot_runtime import list_copilot_models
+
+    try:
+        models = await list_copilot_models()
+        return models
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
@@ -235,12 +247,14 @@ def _no_store_headers() -> dict:
 class RunRequest(BaseModel):
     prompt: str
     executor: str = "copilot"
+    model: Optional[str] = None
     workdir: Optional[str] = None
 
 
 class LoopRequest(BaseModel):
     task: str
     executor: str = "copilot"
+    model: Optional[str] = None
     max_retries: int = 2
     workdir: Optional[str] = None
 
@@ -295,7 +309,7 @@ async def run(request: RunRequest, http_request: Request):
     )
 
     try:
-        executor = pick_executor(request.executor)
+        executor = pick_executor(request.executor, model=request.model)
         result = await executor.run(request.prompt, workdir)
         HeidiLogger.write_run_meta({"status": "completed", "ok": result.ok})
         return RunResponse(run_id=run_id, status="completed", result=result.output)
@@ -329,6 +343,7 @@ async def loop(request: LoopRequest, http_request: Request):
         result = await run_loop(
             task=request.task,
             executor=request.executor,
+            model=request.model,
             max_retries=request.max_retries,
             workdir=workdir,
         )

@@ -2,14 +2,25 @@
 title: Heidi CLI Pipe
 description: Control Copilot/Jules/OpenCode agents from OpenWebUI via Heidi CLI
 author: Heidi
-version: 2.0.0
+version: 2.1.0
 """
 
 import traceback
-from typing import List, Union, Generator, Iterator
+from typing import List, Union, Generator, Iterator, Optional
 
 import requests
 from pydantic import BaseModel, Field
+
+
+COPILOT_MODELS = [
+    "gpt-5",
+    "claude-sonnet-4-20250514",
+    "claude-3-7-sonnet-20250219",
+    "gpt-4o",
+    "gpt-4o-mini",
+    "o3",
+    "o4-mini",
+]
 
 
 class Pipe:
@@ -21,12 +32,34 @@ class Pipe:
             default="", description="API Key for Heidi (required if server has HEIDI_API_KEY set)"
         )
         DEFAULT_EXECUTOR: str = Field(
-            default="copilot", description="Default executor: copilot|jules|opencode"
+            default="copilot", description="Default executor: copilot|jules|opencode|ollama"
         )
-        DEFAULT_AGENT: str = Field(default="high-autonomy", description="Default agent to use")
+        DEFAULT_MODEL: str = Field(
+            default="gpt-5",
+            description="Copilot model to use (e.g., gpt-5, claude-sonnet-4-20250514)",
+        )
         MAX_RETRIES: int = Field(default=2, description="Max re-plans after FAIL")
+
+        # Copilot settings
+        COPILOT_GH_TOKEN: str = Field(
+            default="", description="GitHub token for Copilot (optional, uses gh auth if empty)"
+        )
+
+        # Jules settings
         ENABLE_JULES: bool = Field(default=False, description="Enable Jules CLI integration")
+        JULES_API_KEY: str = Field(default="", description="Jules API Key (optional)")
+
+        # OpenCode settings
         ENABLE_OPENCODE: bool = Field(default=False, description="Enable OpenCode CLI integration")
+        OPENCODE_MODEL: str = Field(
+            default="", description="OpenCode model (e.g., openai/gpt-4o). Leave empty for default."
+        )
+
+        # Ollama settings
+        ENABLE_OLLAMA: bool = Field(default=False, description="Enable Ollama integration")
+        OLLAMA_URL: str = Field(default="http://localhost:11434", description="Ollama server URL")
+        OLLAMA_MODEL: str = Field(default="llama3", description="Ollama model name")
+
         REQUEST_TIMEOUT: int = Field(default=300, description="Request timeout in seconds")
 
     def __init__(self):
@@ -34,6 +67,8 @@ class Pipe:
         self._server_url = None
         self._agents_cache = None
         self._agents_cache_time = 0
+        self._models_cache = None
+        self._models_cache_time = 0
 
     @property
     def server_url(self) -> str:
@@ -47,6 +82,29 @@ class Pipe:
         if self.valves.HEIDI_API_KEY:
             headers["X-Heidi-Key"] = self.valves.HEIDI_API_KEY
         return headers
+
+    def _fetch_models(self) -> List[str]:
+        """Fetch available Copilot models from Heidi server."""
+        import time
+
+        now = time.time()
+        if self._models_cache and (now - self._models_cache_time) < 300:
+            return self._models_cache
+
+        try:
+            url = f"{self.server_url}/models"
+            response = requests.get(url, headers=self._get_headers(), timeout=10)
+            if response.status_code == 200:
+                models_data = response.json()
+                if isinstance(models_data, list):
+                    model_ids = [m.get("id", m.get("name", "")) for m in models_data]
+                    self._models_cache = [m for m in model_ids if m]
+                    self._models_cache_time = now
+                    return self._models_cache
+        except Exception:
+            pass
+
+        return COPILOT_MODELS
 
     def _fetch_agents(self) -> List[tuple]:
         """Fetch agents from Heidi server."""
@@ -129,7 +187,11 @@ class Pipe:
             "task": task,
             "executor": self.valves.DEFAULT_EXECUTOR,
             "max_retries": self.valves.MAX_RETRIES,
+            "model": self.valves.DEFAULT_MODEL
+            if self.valves.DEFAULT_EXECUTOR == "copilot"
+            else None,
         }
+        payload = {k: v for k, v in payload.items() if v}
 
         try:
             response = requests.post(
@@ -175,7 +237,11 @@ class Pipe:
         payload = {
             "prompt": prompt,
             "executor": self.valves.DEFAULT_EXECUTOR,
+            "model": self.valves.DEFAULT_MODEL
+            if self.valves.DEFAULT_EXECUTOR == "copilot"
+            else None,
         }
+        payload = {k: v for k, v in payload.items() if v}
 
         try:
             response = requests.post(
@@ -251,7 +317,11 @@ class Pipe:
         payload = {
             "prompt": prompt,
             "executor": self.valves.DEFAULT_EXECUTOR,
+            "model": self.valves.DEFAULT_MODEL
+            if self.valves.DEFAULT_EXECUTOR == "copilot"
+            else None,
         }
+        payload = {k: v for k, v in payload.items() if v}
 
         try:
             response = requests.post(

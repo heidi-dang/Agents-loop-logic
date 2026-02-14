@@ -8,6 +8,36 @@ from typing import Optional
 from copilot import CopilotClient
 
 
+async def list_copilot_models() -> list[dict]:
+    """List available Copilot models."""
+    models = []
+    try:
+        client = CopilotClient({"use_logged_in_user": True})
+        await client.start()
+        try:
+            raw_models = await client.list_models()
+            for m in raw_models if isinstance(raw_models, list) else []:
+                mid = m.get("id") if isinstance(m, dict) else getattr(m, "id", "")
+                if not mid:
+                    continue
+                billing = m.get("billing", {}) if isinstance(m, dict) else getattr(m, "billing", {})
+                multiplier = (
+                    float(billing.get("multiplier", 1)) if isinstance(billing, dict) else 1.0
+                )
+                models.append(
+                    {
+                        "id": mid,
+                        "name": mid,
+                        "multiplier": multiplier,
+                    }
+                )
+        finally:
+            await client.stop()
+    except Exception as e:
+        return [{"error": str(e)}]
+    return models
+
+
 class CopilotRuntime:
     """Thin wrapper around CopilotClient with sensible defaults."""
 
