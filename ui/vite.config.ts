@@ -7,7 +7,7 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3002,
     strictPort: true,
-    allowedHosts: true,
+    allowedHosts: ["heidiai.com.au", ".heidiai.com.au"],
     proxy: {
       '^/health': {
         target: 'http://127.0.0.1:7777',
