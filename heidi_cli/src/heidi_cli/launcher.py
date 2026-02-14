@@ -354,10 +354,10 @@ def get_status() -> Dict[str, dict]:
             status["ui"] = {
                 "pid": pids["ui"],
                 "running": is_ui_running(),
-                "port": 3000,
+                "port": 3002,
             }
         except OSError:
-            status["ui"] = {"pid": pids["ui"], "running": False, "port": 3000}
+            status["ui"] = {"pid": pids["ui"], "running": False, "port": 3002}
             remove_pid("ui")
 
     return status

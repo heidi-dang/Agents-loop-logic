@@ -174,6 +174,28 @@ pip install --upgrade pip -q
 # Install in editable mode
 pip install -e ".[dev]" -q
 
+# Setup UI (auto-update or clone)
+echo ""
+echo "Setting up UI..."
+
+# Determine UI directory
+if [ -n "$HEIDI_HOME" ]; then
+    UI_DIR="$HEIDI_HOME/ui"
+else
+    # Use OS cache dir (XDG_CACHE_HOME or ~/.cache)
+    CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}"
+    UI_DIR="$CACHE_DIR/heidi/ui"
+fi
+
+if [ -d "$UI_DIR" ]; then
+    echo "Updating UI in $UI_DIR..."
+    git -C "$UI_DIR" pull --ff-only origin main 2>/dev/null || echo "Could not update UI (may have local changes)"
+else
+    echo "Cloning UI to $UI_DIR..."
+    mkdir -p "$(dirname "$UI_DIR")"
+    git clone --depth 1 https://github.com/heidi-dang/heidi-cli-ui.git "$UI_DIR"
+fi
+
 echo ""
 echo "Heidi CLI installed successfully!"
 echo ""
@@ -183,3 +205,7 @@ echo ""
 echo "Then run:"
 echo "  heidi init"
 echo "  heidi --help"
+echo ""
+echo "To start the UI:"
+echo "  heidi serve --ui"
+echo "  # Or: heidi start ui"

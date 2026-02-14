@@ -31,8 +31,13 @@ Heidi-CLI provides a flexible system for running AI-powered agent workflows with
 
 ## Storage
 
-- **State** (`.heidi/`) - Config, secrets, auth, valves (project-local, not tracked)
-- **Artifacts** (`./tasks/`) - Task files (`<slug>.md`), audit files (`<slug>.audit.md`) - tracked in repo
+- **Config** - Global config stored in OS-specific location (not project-local):
+  - Linux: `~/.config/heidi/` (or `$XDG_CONFIG_HOME/heidi`)
+  - macOS: `~/Library/Application Support/Heidi`
+  - Windows: `%APPDATA%/Heidi`
+- **State** - Optional state in OS-specific location
+- **Cache** - Optional cache in OS-specific location
+- **Tasks** (`./tasks/`) - Task files (`<slug>.md`), audit files (`<slug>.audit.md`) - tracked in repo
 
 ## Project Structure
 
@@ -106,7 +111,8 @@ heidi openwebui guide
 | Command | Description |
 |---------|-------------|
 | `heidi setup` | Interactive setup wizard for first-time users |
-| `heidi init` | Initialize `.heidi/` directory |
+| `heidi init` | Initialize global config directory |
+| `heidi paths` | Show config/state/cache paths |
 | `heidi auth gh` | Authenticate with GitHub |
 | `heidi doctor` | Check all dependencies |
 | `heidi copilot status` | Show Copilot connection status |
@@ -125,7 +131,7 @@ heidi openwebui guide
 The interactive setup wizard (`heidi setup`) guides you through:
 
 1. **Environment Check** - Verifies Python, Copilot SDK, and optional tools
-2. **Heidi Initialization** - Creates `.heidi/` directory and config files
+2. **Heidi Initialization** - Creates global config directory
 3. **GitHub Authentication** - Sets up GitHub token for Copilot access
 4. **OpenWebUI Integration** - Configures connection to OpenWebUI
 5. **Final Summary** - Shows setup status and next steps
