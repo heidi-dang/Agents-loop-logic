@@ -171,7 +171,7 @@ heidi connect disconnect opencode --yes
 ### Connection Details
 
 | Service | Default URL | Health Endpoint |
-|---------|-------------|------------------|
+main
 | Ollama | `http://127.0.0.1:11434` | `/api/version` |
 | OpenCode Server | `http://127.0.0.1:4096` | `/global/health` |
 
