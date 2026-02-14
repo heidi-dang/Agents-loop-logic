@@ -1385,10 +1385,14 @@ def serve(
         console.print("[cyan]Starting UI dev server on http://localhost:3002...[/cyan]")
 
         def start_ui():
+            env = os.environ.copy()
+            env["API_URL"] = f"http://{host}:{port}"
+            env["VITE_HEIDI_SERVER_BASE"] = f"http://{host}:{port}"
+            env["HEIDI_SERVER_BASE"] = f"http://{host}:{port}"
             subprocess.run(
                 ["npm", "run", "dev", "--", "--port", "3002"],
                 cwd=ui_path,
-                env={**os.environ, "API_URL": f"http://{host}:{port}"},
+                env=env,
             )
 
         ui_thread = threading.Thread(target=start_ui, daemon=True)
@@ -1591,7 +1595,9 @@ def start_ui(
     open_browser: bool = typer.Option(True, "--open/--no-open", help="Open browser automatically"),
     tunnel: bool = typer.Option(False, "--tunnel", help="Start Cloudflare tunnel"),
     api_url: str = typer.Option(
-        "", "--api-url", help="API URL for UI (default: http://localhost:PORT)"
+        "",
+        "--api-url",
+        help="Backend URL (default: http://localhost:7777, or set HEIDI_SERVER_BASE env)",
     ),
 ) -> None:
     """Start Heidi backend and UI dev server."""
