@@ -106,6 +106,25 @@ class Pipe:
 
         return COPILOT_MODELS
 
+    def _get_executor_and_model(self, model_id: str = None) -> tuple:
+        """Extract executor and model from model ID (e.g., 'copilot/gpt-5' -> ('copilot', 'gpt-5'))."""
+        if not model_id:
+            return self.valves.DEFAULT_EXECUTOR, self.valves.DEFAULT_MODEL
+
+        if "/" in model_id:
+            executor, model = model_id.split("/", 1)
+            # Map executor names
+            if executor == "opencode":
+                return "opencode", model
+            elif executor == "ollama":
+                return "ollama", model
+            elif executor == "jules":
+                return "jules", model
+            elif executor == "copilot":
+                return "copilot", model
+
+        return self.valves.DEFAULT_EXECUTOR, model_id or self.valves.DEFAULT_MODEL
+
     def _fetch_agents(self) -> List[tuple]:
         """Fetch agents from Heidi server."""
         import time
@@ -138,11 +157,106 @@ class Pipe:
             ("self-auditing", "Self-audits agent output before human review"),
         ]
 
+    async def pipes(self):
+        """Return available models from Copilot, Jules, and OpenCode."""
+        import time
+        import subprocess
+        import shutil
+
+        models = []
+        now = time.time()
+
+        # Fetch Copilot models from server
+        try:
+            url = f"{self.server_url}/models"
+            response = requests.get(url, headers=self._get_headers(), timeout=10)
+            if response.status_code == 200:
+                copilot_models = response.json()
+                if isinstance(copilot_models, list):
+                    for m in copilot_models:
+                        mid = m.get("id") or m.get("name", "")
+                        if mid and not mid.startswith("error"):
+                            models.append(
+                                {
+                                    "id": f"copilot/{mid}",
+                                    "name": f"Copilot: {mid}",
+                                }
+                            )
+        except Exception:
+            pass
+
+        # Fallback Copilot models if server unavailable
+        if not models:
+            for m in COPILOT_MODELS:
+                models.append(
+                    {
+                        "id": f"copilot/{m}",
+                        "name": f"Copilot: {m}",
+                    }
+                )
+
+        # Fetch OpenCode models
+        if self.valves.ENABLE_OPENCODE:
+            try:
+                result = subprocess.run(
+                    ["opencode", "models", "openai"],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    for line in result.stdout.strip().split("\n"):
+                        model_name = line.strip()
+                        if model_name:
+                            models.append(
+                                {
+                                    "id": f"opencode/{model_name}",
+                                    "name": f"OpenCode: {model_name}",
+                                }
+                            )
+            except Exception:
+                pass
+
+        # Add Ollama models if enabled
+        if self.valves.ENABLE_OLLAMA:
+            try:
+                resp = requests.get(f"{self.valves.OLLAMA_URL}/api/tags", timeout=10)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    for model in data.get("models", []):
+                        model_name = model.get("name", "")
+                        if model_name:
+                            models.append(
+                                {
+                                    "id": f"ollama/{model_name}",
+                                    "name": f"Ollama: {model_name}",
+                                }
+                            )
+            except Exception:
+                pass
+
+        # Add placeholder for Jules (API-based, no model listing)
+        if self.valves.ENABLE_JULES:
+            models.append(
+                {
+                    "id": "jules/default",
+                    "name": "Jules (uses default model)",
+                }
+            )
+
+        return models
+
     async def pipe(self, body: dict) -> Union[str, Generator, Iterator]:
         """
         The main entry point for OpenWebUI Pipes (async).
         """
         try:
+            # Get selected model from body
+            selected_model = body.get("model", "")
+
+            # Extract executor and model from selection
+            executor, model = self._get_executor_and_model(selected_model)
+
             if "messages" not in body or not body["messages"]:
                 return "No messages found"
 
@@ -150,11 +264,11 @@ class Pipe:
 
             if last_message.startswith("loop:"):
                 task = last_message.replace("loop:", "").strip()
-                return await self.execute_loop(task)
+                return await self.execute_loop(task, executor=executor, model=model)
 
             if last_message.startswith("run:"):
                 prompt = last_message.replace("run:", "").strip()
-                return await self.execute_run(prompt)
+                return await self.execute_run(prompt, executor=executor, model=model)
 
             if last_message.startswith("agents"):
                 return self.list_agents()
@@ -162,7 +276,7 @@ class Pipe:
             if last_message.startswith("runs"):
                 return await self.list_runs()
 
-            return await self.chat_with_heidi(body["messages"])
+            return await self.chat_with_heidi(body["messages"], executor=executor, model=model)
 
         except Exception as e:
             traceback.print_exc()
@@ -180,16 +294,16 @@ class Pipe:
 
         return output
 
-    async def execute_loop(self, task: str) -> str:
+    async def execute_loop(self, task: str, executor: str = None, model: str = None) -> str:
         """Execute a full agent loop (Plan → Runner → Audit)."""
+        executor = executor or self.valves.DEFAULT_EXECUTOR
+        model = model or self.valves.DEFAULT_MODEL
         url = f"{self.server_url}/loop"
         payload = {
             "task": task,
-            "executor": self.valves.DEFAULT_EXECUTOR,
+            "executor": executor,
             "max_retries": self.valves.MAX_RETRIES,
-            "model": self.valves.DEFAULT_MODEL
-            if self.valves.DEFAULT_EXECUTOR == "copilot"
-            else None,
+            "model": model if executor == "copilot" else None,
         }
         payload = {k: v for k, v in payload.items() if v}
 
@@ -231,15 +345,15 @@ class Pipe:
         except Exception as e:
             return f"**Heidi Loop Error**\n\n{str(e)}\n"
 
-    async def execute_run(self, prompt: str) -> str:
+    async def execute_run(self, prompt: str, executor: str = None, model: str = None) -> str:
         """Execute a single prompt with the specified executor."""
+        executor = executor or self.valves.DEFAULT_EXECUTOR
+        model = model or self.valves.DEFAULT_MODEL
         url = f"{self.server_url}/run"
         payload = {
             "prompt": prompt,
-            "executor": self.valves.DEFAULT_EXECUTOR,
-            "model": self.valves.DEFAULT_MODEL
-            if self.valves.DEFAULT_EXECUTOR == "copilot"
-            else None,
+            "executor": executor,
+            "model": model if executor == "copilot" else None,
         }
         payload = {k: v for k, v in payload.items() if v}
 
@@ -309,17 +423,19 @@ class Pipe:
             return f"**Error listing runs**\n\n{str(e)}\n"
         return "**Error listing runs**\n"
 
-    async def chat_with_heidi(self, messages: List[dict]) -> str:
+    async def chat_with_heidi(
+        self, messages: List[dict], executor: str = None, model: str = None
+    ) -> str:
         """Route chat messages to Copilot via Heidi."""
+        executor = executor or self.valves.DEFAULT_EXECUTOR
+        model = model or self.valves.DEFAULT_MODEL
         prompt = "\n".join([m.get("content", "") for m in messages])
 
         url = f"{self.server_url}/run"
         payload = {
             "prompt": prompt,
-            "executor": self.valves.DEFAULT_EXECUTOR,
-            "model": self.valves.DEFAULT_MODEL
-            if self.valves.DEFAULT_EXECUTOR == "copilot"
-            else None,
+            "executor": executor,
+            "model": model if executor == "copilot" else None,
         }
         payload = {k: v for k, v in payload.items() if v}
 
