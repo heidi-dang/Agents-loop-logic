@@ -399,3 +399,104 @@ async def auth_status(request: Request):
         if request.state.user
         else None,
     }
+
+
+@app.get("/connect/opencode/openai/status")
+async def opencode_openai_status():
+    """Check OpenCode OpenAI connection status for UI."""
+    import os
+    import shutil
+    from pathlib import Path
+
+    opencode_path = shutil.which("opencode")
+    if not opencode_path:
+        return {
+            "connected": False,
+            "error": "OpenCode CLI not installed",
+            "authPath": None,
+            "models": [],
+        }
+
+    if os.name == "nt":
+        user_profile = os.environ.get("USERPROFILE", "")
+        auth_path = Path(user_profile) / ".local" / "share" / "opencode" / "auth.json"
+    else:
+        auth_path = Path.home() / ".local" / "share" / "opencode" / "auth.json"
+
+    if not auth_path.exists():
+        return {
+            "connected": False,
+            "error": "OpenCode auth not found. Run 'heidi connect opencode openai'",
+            "authPath": str(auth_path),
+            "models": [],
+        }
+
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["opencode", "models", "openai"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            lines = result.stdout.strip().split("\n")
+            models = [line.strip() for line in lines if line.strip()]
+            return {
+                "connected": True,
+                "error": None,
+                "authPath": str(auth_path),
+                "models": models,
+            }
+        return {
+            "connected": False,
+            "error": "OpenAI not connected",
+            "authPath": str(auth_path),
+            "models": [],
+        }
+    except Exception as e:
+        return {
+            "connected": False,
+            "error": str(e),
+            "authPath": str(auth_path),
+            "models": [],
+        }
+
+
+@app.post("/connect/opencode/openai/test")
+async def opencode_openai_test():
+    """Test OpenCode OpenAI connection."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["opencode", "models", "openai"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            return {"pass": False, "error": "No OpenAI models", "output": ""}
+
+        lines = result.stdout.strip().split("\n")
+        models = [line.strip() for line in lines if line.strip()]
+        if not models:
+            return {"pass": False, "error": "No models", "output": ""}
+
+        first_model = models[0]
+    except Exception as e:
+        return {"pass": False, "error": str(e), "output": ""}
+
+    try:
+        result = subprocess.run(
+            ["opencode", "run", "say ok", f"--model=openai/{first_model.split('/')[-1]}"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode == 0:
+            return {"pass": True, "error": None, "output": result.stdout[:500]}
+        return {"pass": False, "error": result.stderr[:200], "output": ""}
+    except Exception as e:
+        return {"pass": False, "error": str(e), "output": ""}

@@ -547,6 +547,79 @@ def connect_opencode(
         raise typer.Exit(1)
 
 
+@connect_app.command("openai")
+def connect_opencode_openai() -> None:
+    """Connect to OpenAI (ChatGPT Plus/Pro) via OpenCode OAuth.
+
+    This command:
+    1. Installs the OpenCode OpenAI plugin
+    2. Launches OpenCode login (browser OAuth)
+    3. Verifies the connection works
+
+    After connecting, you can use ChatGPT models through OpenCode.
+    """
+    from .connect import (
+        check_opencode_openai,
+        connect_opencode_openai as do_connect,
+        test_openai_connection,
+    )
+
+    console.print("[cyan]Connecting to OpenAI (ChatGPT Plus/Pro) via OpenCode...[/cyan]")
+    console.print("")
+    console.print("This will:")
+    console.print("  1. Install OpenCode OpenAI plugin")
+    console.print("  2. Open browser for OAuth login")
+    console.print("  3. Verify models are available")
+    console.print("")
+
+    # Check prerequisites
+    opencode_path = shutil.which("opencode")
+    if not opencode_path:
+        console.print("[red]OpenCode CLI not found![/red]")
+        console.print("[yellow]Install from: https://opencode.ai[/yellow]")
+        raise typer.Exit(1)
+
+    npx_path = shutil.which("npx")
+    if not npx_path:
+        console.print("[red]npx not found![/red]")
+        console.print("[yellow]Install Node.js to use OpenAI provider.[/yellow]")
+        raise typer.Exit(1)
+
+    # Check if already connected
+    console.print("[cyan]Checking existing connection...[/cyan]")
+    success, msg = check_opencode_openai()
+    if success:
+        console.print(f"[green]✓ {msg}[/green]")
+        console.print(
+            "[dim]Already connected. Use 'heidi connect opencode openai --reconnect' to reconnect.[/dim]"
+        )
+        return
+
+    # Do the connection
+    console.print("")
+    success, msg = do_connect()
+    if success:
+        console.print(f"[green]✓ {msg}[/green]")
+
+        # Test the connection
+        console.print("")
+        console.print("[cyan]Testing connection...[/cyan]")
+        test_success, test_msg = test_openai_connection()
+        if test_success:
+            console.print(f"[green]✓ {test_msg}[/green]")
+        else:
+            console.print(f"[yellow]⚠ {test_msg}[/yellow]")
+            console.print("[dim]You may need to wait for OAuth to complete or try again.[/dim]")
+    else:
+        console.print(f"[red]✗ {msg}[/red]")
+        console.print("")
+        console.print("[yellow]If browser didn't open, try these alternatives:[/yellow]")
+        console.print("  1. Run: opencode auth login")
+        console.print("  2. For headless: codex login --device-auth")
+        console.print("  3. Then run: heidi connect opencode openai --verify")
+        raise typer.Exit(1)
+
+
 @connect_app.command("disconnect")
 def connect_disconnect(
     service: str = typer.Argument(..., help="Service to disconnect: ollama, opencode"),
