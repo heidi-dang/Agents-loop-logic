@@ -116,6 +116,9 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
     }
   };
 
+  const terminalStatuses = new Set(['completed', 'failed', 'cancelled', 'idle']);
+  const isRunning = runId && !terminalStatuses.has(status.toLowerCase());
+
   const handleStart = async () => {
     if (!prompt.trim()) return;
 
@@ -529,20 +532,20 @@ const Chat: React.FC<ChatProps> = ({ initialRunId, onRunCreated, isSidebarOpen, 
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey && !runId) {
+                        if (e.key === 'Enter' && !e.shiftKey && !isRunning) {
                             e.preventDefault();
                             handleStart();
                         }
                     }}
                     placeholder={mode === AppMode.LOOP ? "Describe the task you want Heidi to complete..." : "Ask Heidi a question or give a command..."}
-                    disabled={!!runId || isSending}
+                    disabled={isSending || isRunning}
                     className="w-full bg-black/20 border border-white/10 text-white placeholder-slate-500/70 rounded-xl p-4 pr-16 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 outline-none resize-none min-h-[60px] max-h-[200px] shadow-inner disabled:opacity-50 disabled:cursor-not-allowed transition-all group-hover:bg-black/30"
                     rows={1}
                     style={{ minHeight: '80px' }}
                 />
                 
                 <div className="absolute right-3 bottom-3">
-                    {!runId ? (
+                    {!isRunning ? (
                         <button
                             onClick={handleStart}
                             disabled={!prompt.trim() || isSending}

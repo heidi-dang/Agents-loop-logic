@@ -198,7 +198,14 @@ async def get_run(run_id: str, request: Request):
         events = []
         for line in transcript.read_text().strip().split("\n"):
             if line:
-                events.append(json.loads(line))
+                raw = json.loads(line)
+                event = {
+                    "type": raw.get("type", ""),
+                    "ts": raw.get("timestamp", ""),
+                    "message": raw.get("data", {}).get("message", ""),
+                    "details": raw.get("data", {}),
+                }
+                events.append(event)
         result["events"] = events
 
     return result
@@ -242,6 +249,38 @@ def _no_store_headers() -> dict:
         "Connection": "keep-alive",
         "X-Accel-Buffering": "no",
     }
+
+
+@app.post("/runs/{run_id}/cancel")
+async def cancel_run(run_id: str, request: Request):
+    _require_api_key(request)
+    from .config import ConfigManager
+    from .logging import HeidiLogger
+
+    run_dir = ConfigManager.runs_dir() / run_id
+    if not run_dir.exists():
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    run_json = run_dir / "run.json"
+    if run_json.exists():
+        meta = json.loads(run_json.read_text())
+        if meta.get("status") in ["completed", "failed", "cancelled"]:
+            return {"status": "already_terminal", "run_id": run_id}
+
+    import uuid
+
+    cancel_id = str(uuid.uuid4())[:8]
+    HeidiLogger.write_run_meta(
+        {
+            "status": "cancelled",
+            "cancelled_at": str(asyncio.get_event_loop().time()),
+        }
+    )
+
+    cancel_marker = run_dir / "cancelled"
+    cancel_marker.write_text(cancel_id)
+
+    return {"status": "cancelled", "run_id": run_id}
 
 
 class RunRequest(BaseModel):
@@ -305,17 +344,22 @@ async def run(request: RunRequest, http_request: Request):
             "prompt": request.prompt,
             "executor": request.executor,
             "workdir": str(workdir),
+            "status": "running",
         }
     )
 
-    try:
-        executor = pick_executor(request.executor, model=request.model)
-        result = await executor.run(request.prompt, workdir)
-        HeidiLogger.write_run_meta({"status": "completed", "ok": result.ok})
-        return RunResponse(run_id=run_id, status="completed", result=result.output)
-    except Exception as e:
-        HeidiLogger.write_run_meta({"status": "failed", "error": str(e)})
-        return RunResponse(run_id=run_id, status="failed", error=str(e))
+    async def _run_background():
+        try:
+            executor = pick_executor(request.executor, model=request.model)
+            result = await executor.run(request.prompt, workdir)
+            HeidiLogger.write_run_meta(
+                {"status": "completed", "ok": result.ok, "result": result.output}
+            )
+        except Exception as e:
+            HeidiLogger.write_run_meta({"status": "failed", "error": str(e)})
+
+    asyncio.create_task(_run_background())
+    return RunResponse(run_id=run_id, status="running")
 
 
 @app.post("/loop", response_model=RunResponse)
@@ -336,22 +380,25 @@ async def loop(request: LoopRequest, http_request: Request):
             "executor": request.executor,
             "max_retries": request.max_retries,
             "workdir": str(workdir),
+            "status": "running",
         }
     )
 
-    try:
-        result = await run_loop(
-            task=request.task,
-            executor=request.executor,
-            model=request.model,
-            max_retries=request.max_retries,
-            workdir=workdir,
-        )
-        HeidiLogger.write_run_meta({"status": "completed", "result": result})
-        return RunResponse(run_id=run_id, status="completed", result=result)
-    except Exception as e:
-        HeidiLogger.write_run_meta({"status": "failed", "error": str(e)})
-        return RunResponse(run_id=run_id, status="failed", error=str(e))
+    async def _loop_background():
+        try:
+            result = await run_loop(
+                task=request.task,
+                executor=request.executor,
+                model=request.model,
+                max_retries=request.max_retries,
+                workdir=workdir,
+            )
+            HeidiLogger.write_run_meta({"status": "completed", "result": result})
+        except Exception as e:
+            HeidiLogger.write_run_meta({"status": "failed", "error": str(e)})
+
+    asyncio.create_task(_loop_background())
+    return RunResponse(run_id=run_id, status="running")
 
 
 def start_server(host: str = "0.0.0.0", port: int = 7777):
