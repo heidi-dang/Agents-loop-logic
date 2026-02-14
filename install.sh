@@ -204,11 +204,24 @@ echo "UI source: $INSTALL_DIR/ui"
 echo "UI version: $UI_VERSION"
 echo "UI dest: $UI_DIR"
 
-# Copy UI
+# Copy UI source
 mkdir -p "$(dirname "$UI_DIR")"
 rm -rf "$UI_DIR"
 cp -r "$INSTALL_DIR/ui" "$UI_DIR"
 echo "UI installed."
+
+# Build UI for server
+echo "Building UI..."
+cd "$UI_DIR"
+npm install --silent 2>/dev/null || true
+npm run build 2>/dev/null || echo "Warning: UI build failed, using source"
+
+# Copy built UI to server's ui_dist
+UI_DIST="$INSTALL_DIR/heidi_cli/src/heidi_cli/ui_dist"
+mkdir -p "$UI_DIST"
+rm -rf "$UI_DIST"/*
+cp -r "$UI_DIR/dist"/* "$UI_DIST/" 2>/dev/null || echo "Note: UI not built, server will show build message"
+echo "UI built to: $UI_DIST"
 
 # Create global config/state/cache dirs
 if [ -n "$HEIDI_HOME" ]; then
