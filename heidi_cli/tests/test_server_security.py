@@ -3,20 +3,27 @@ import sys
 import pytest
 from pathlib import Path
 
-# Debugging imports for CI failure diagnosis
+# Ensure pydantic is not mocked (CI Fix)
 try:
     import pydantic
-    print(f"DEBUG: pydantic: {pydantic}")
-    print(f"DEBUG: pydantic file: {getattr(pydantic, '__file__', 'unknown')}")
-    print(f"DEBUG: pydantic path: {getattr(pydantic, '__path__', 'unknown')}")
-except ImportError:
-    print("DEBUG: pydantic not found")
+    from unittest.mock import MagicMock
 
-try:
-    from fastapi.testclient import TestClient
-except ImportError as e:
-    print(f"DEBUG: Failed to import TestClient: {e}")
-    raise
+    # If pydantic is a mock, force reload the real module
+    if isinstance(pydantic, MagicMock) or hasattr(pydantic, 'mock_calls') or not hasattr(pydantic, '__file__'):
+        print("DEBUG: Detected pydantic mock, attempting to reload real module...")
+        if 'pydantic' in sys.modules:
+            del sys.modules['pydantic']
+        if 'pydantic.main' in sys.modules:
+            del sys.modules['pydantic.main']
+        if 'fastapi' in sys.modules:
+            del sys.modules['fastapi']
+
+        import pydantic
+        print(f"DEBUG: Reloaded pydantic: {pydantic}")
+except ImportError:
+    pass
+
+from fastapi.testclient import TestClient
 
 from unittest.mock import patch
 from heidi_cli.server import app
