@@ -2,16 +2,27 @@
 import os
 import sys
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-# Mock modules that are missing in this environment but needed for imports
-# This allows the test to run even if keyring/github_copilot_sdk are not installed
+# Only mock dependencies if they are truly missing
+# This avoids interference if they are installed (like in CI)
 if "keyring" not in sys.modules:
-    sys.modules["keyring"] = MagicMock()
+    try:
+        import keyring
+    except ImportError:
+        sys.modules["keyring"] = MagicMock()
+
 if "github_copilot_sdk" not in sys.modules:
-    sys.modules["github_copilot_sdk"] = MagicMock()
+    try:
+        import github_copilot_sdk
+    except ImportError:
+        sys.modules["github_copilot_sdk"] = MagicMock()
+
 if "copilot" not in sys.modules:
-    sys.modules["copilot"] = MagicMock()
+    try:
+        import copilot
+    except ImportError:
+        sys.modules["copilot"] = MagicMock()
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.testclient import TestClient
