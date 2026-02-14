@@ -205,17 +205,11 @@ echo "UI source: $INSTALL_DIR/ui"
 echo "UI version: $UI_VERSION"
 echo "UI dest: $UI_DIR"
 
-# Copy UI from repo to cache dir (rsync-like behavior: update + delete removed files)
+# Copy UI from repo to cache dir
 if [ -d "$UI_DIR" ]; then
     echo "Updating UI in $UI_DIR..."
-    # Use rsync if available, otherwise cp -rT (copy with overwrite)
-    if command -v rsync &> /dev/null; then
-        rsync -a --delete "$INSTALL_DIR/ui/" "$UI_DIR/"
-    else
-        # Fallback: rm and copy
-        rm -rf "$UI_DIR"
-        cp -r "$INSTALL_DIR/ui" "$UI_DIR"
-    fi
+    rm -rf "$UI_DIR"
+    cp -r "$INSTALL_DIR/ui" "$UI_DIR"
 else
     echo "Installing UI to $UI_DIR..."
     mkdir -p "$(dirname "$UI_DIR")"
