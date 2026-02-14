@@ -180,7 +180,7 @@ pip install --upgrade pip -q
 # Install in editable mode
 pip install -e ".[dev]" -q
 
-# Setup UI (auto-update or clone)
+# Setup UI (copy from cloned repo)
 echo ""
 echo "Setting up UI..."
 
@@ -193,13 +193,34 @@ else
     UI_DIR="$CACHE_DIR/heidi/ui"
 fi
 
+# Safety check: UI must exist in cloned repo
+if [ ! -f "$INSTALL_DIR/ui/package.json" ]; then
+    echo "ERROR: UI not bundled in heidi-cli. Expected $INSTALL_DIR/ui/package.json"
+    exit 1
+fi
+
+# Get git commit for UI version tracking
+UI_VERSION=$(git -C "$INSTALL_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+echo "UI source: $INSTALL_DIR/ui"
+echo "UI version: $UI_VERSION"
+echo "UI dest: $UI_DIR"
+
+# Copy UI from repo to cache dir (rsync-like behavior: update + delete removed files)
 if [ -d "$UI_DIR" ]; then
     echo "Updating UI in $UI_DIR..."
-    git -C "$UI_DIR" pull --ff-only origin main 2>/dev/null || echo "Could not update UI (may have local changes)"
+    # Use rsync if available, otherwise cp -rT (copy with overwrite)
+    if command -v rsync &> /dev/null; then
+        rsync -a --delete "$INSTALL_DIR/ui/" "$UI_DIR/"
+    else
+        # Fallback: rm and copy
+        rm -rf "$UI_DIR"
+        cp -r "$INSTALL_DIR/ui" "$UI_DIR"
+    fi
 else
-    echo "Cloning UI to $UI_DIR..."
+    echo "Installing UI to $UI_DIR..."
     mkdir -p "$(dirname "$UI_DIR")"
-    git clone --depth 1 https://github.com/heidi-dang/heidi-cli-ui.git "$UI_DIR"
+    cp -r "$INSTALL_DIR/ui" "$UI_DIR"
+fi
 fi
 
 # Create global config/state/cache dirs (no secrets) so CI + UX are deterministic
