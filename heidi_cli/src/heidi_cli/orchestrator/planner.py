@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Optional
 
 from .session import Session, SessionState
-from .loop import pick_executor, run_loop, execute_workflow, extract_task_slug
+from .loop import pick_executor, execute_workflow, extract_task_slug
 from .artifacts import TaskArtifact
 
 class PlannerAgent:

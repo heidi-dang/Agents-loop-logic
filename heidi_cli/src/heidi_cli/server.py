@@ -15,7 +15,7 @@ import uvicorn
 from .auth_db import init_db
 from .auth_middleware import AuthMiddleware
 from .orchestrator.planner import PlannerAgent
-from .orchestrator.session import Session, SessionState
+from .orchestrator.session import Session
 
 # Optional API key protection:
 # - If HEIDI_API_KEY is set, protected endpoints require:
