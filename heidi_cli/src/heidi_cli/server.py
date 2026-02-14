@@ -104,8 +104,6 @@ def _check_auth(request: Request, stream_key: Optional[str] = None) -> bool:
 
 
 def _require_api_key(request: Request, stream_key: Optional[str] = None) -> None:
-    if not HEIDI_API_KEY:
-        return
     if not _check_auth(request, stream_key):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
