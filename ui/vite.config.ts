@@ -13,6 +13,30 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      '/health': {
+        target: 'http://127.0.0.1:7777',
+        changeOrigin: true,
+      },
+      '/agents': {
+        target: 'http://127.0.0.1:7777',
+        changeOrigin: true,
+      },
+      '/run': {
+        target: 'http://127.0.0.1:7777',
+        changeOrigin: true,
+      },
+      '/loop': {
+        target: 'http://127.0.0.1:7777',
+        changeOrigin: true,
+      },
+      '/runs': {
+        target: 'http://127.0.0.1:7777',
+        changeOrigin: true,
+      },
+      '/auth': {
+        target: 'http://127.0.0.1:7777',
+        changeOrigin: true,
+      },
     },
   },
 });
