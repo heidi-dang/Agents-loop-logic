@@ -2050,8 +2050,8 @@ def ui_build_cmd(
         console.print("Installing dependencies...")
         subprocess.run(["npm", "install"], cwd=ui_source, check=True)
 
-    console.print("Building...")
-    subprocess.run(["npm", "run", "build"], cwd=ui_source, check=True)
+    console.print("Building with base /ui/...")
+    subprocess.run(["npm", "run", "build", "--", "--base=/ui/"], cwd=ui_source, check=True)
 
     # Copy to cache
     ui_cache.parent.mkdir(parents=True, exist_ok=True)
