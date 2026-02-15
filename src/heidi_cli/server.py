@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Optional, List, Dict
@@ -244,9 +245,22 @@ async def list_runs(limit: int = 10, request: Request = None):
     return runs
 
 
+def validate_run_id(run_id: str):
+    """Validate run_id format to prevent path traversal."""
+    if not run_id or len(run_id) > 64:
+        raise HTTPException(status_code=400, detail="Invalid run_id")
+    # Check for path traversal attempts explicitly
+    if ".." in run_id or "/" in run_id or "\\" in run_id:
+        raise HTTPException(status_code=400, detail="Invalid run_id")
+    # Allowed characters: alphanumeric, hyphen, underscore, dot
+    if not re.match(r"^[a-zA-Z0-9_\-\.]+$", run_id):
+        raise HTTPException(status_code=400, detail="Invalid run_id")
+
+
 @app.get("/runs/{run_id}")
 async def get_run(run_id: str, request: Request):
     _require_api_key(request)
+    validate_run_id(run_id)
     from .config import ConfigManager
 
     run_dir = ConfigManager.runs_dir() / run_id
@@ -281,6 +295,7 @@ async def get_run(run_id: str, request: Request):
 @app.get("/runs/{run_id}/stream")
 async def stream_run(run_id: str, request: Request, key: Optional[str] = None):
     _require_api_key(request, stream_key=key)
+    validate_run_id(run_id)
     from .config import ConfigManager
 
     run_dir = ConfigManager.runs_dir() / run_id
@@ -321,6 +336,7 @@ def _no_store_headers() -> dict:
 @app.post("/runs/{run_id}/cancel")
 async def cancel_run(run_id: str, request: Request):
     _require_api_key(request)
+    validate_run_id(run_id)
     from .config import ConfigManager
     from .logging import HeidiLogger
 
