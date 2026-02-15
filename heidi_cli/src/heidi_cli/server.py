@@ -5,7 +5,7 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +15,8 @@ import uvicorn
 
 from .auth_db import init_db
 from .auth_middleware import AuthMiddleware
+from .orchestrator.session import OrchestratorSession
+from .orchestrator.executors import pick_executor
 
 # Optional API key protection:
 # - If HEIDI_API_KEY is set, protected endpoints require:
@@ -41,6 +43,18 @@ else:
     ]
 
 app = FastAPI(title="Heidi CLI Server")
+
+
+# Global Session Store (In-Memory for MVP)
+# In production this should be a proper store or per-user session management
+GLOBAL_SESSIONS: Dict[str, OrchestratorSession] = {}
+DEFAULT_SESSION_ID = "default_session"
+
+
+def get_or_create_session(session_id: str = DEFAULT_SESSION_ID) -> OrchestratorSession:
+    if session_id not in GLOBAL_SESSIONS:
+        GLOBAL_SESSIONS[session_id] = OrchestratorSession(session_id=session_id)
+    return GLOBAL_SESSIONS[session_id]
 
 
 # UI distribution directory - check multiple locations
@@ -406,12 +420,8 @@ async def run(request: RunRequest, http_request: Request):
     )
 
     if request.dry_run:
-        HeidiLogger.write_run_meta(
-            {"status": "completed", "result": "Dry run: Execution skipped."}
-        )
-        return RunResponse(
-            run_id=run_id, status="completed", result="Dry run: Execution skipped."
-        )
+        HeidiLogger.write_run_meta({"status": "completed", "result": "Dry run: Execution skipped."})
+        return RunResponse(run_id=run_id, status="completed", result="Dry run: Execution skipped.")
 
     try:
         executor = pick_executor(request.executor, model=request.model)
@@ -574,17 +584,90 @@ async def list_models_v1():
         }
     )
 
+    # Add Planner Model
+    models.append(
+        {
+            "id": "heidi-planner",
+            "object": "model",
+            "created": 1677610602,
+            "owned_by": "heidi-cli",
+        }
+    )
+
     return {"object": "list", "data": models}
 
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest, http_request: Request):
     """OpenAI-compatible /v1/chat/completions endpoint."""
-    from .orchestrator.loop import pick_executor
     from .logging import HeidiLogger
     from .copilot_runtime import CopilotRuntime
 
     model_id = request.model
+
+    # === PLANNER WORKFLOW ===
+    if model_id == "heidi-planner":
+        session = get_or_create_session()
+        last_msg = request.messages[-1].content
+
+        # In a real streaming scenario we'd need to adapt handle_input to be async generator
+        # For now, we block and return full response or simple chunks
+        response_text = await session.handle_input(last_msg)
+
+        run_id = HeidiLogger.init_run()
+
+        if request.stream:
+
+            async def planner_stream():
+                # Split by lines to simulate streaming feel
+                lines = response_text.split("\n")
+                for line in lines:
+                    chunk = {
+                        "id": f"chatcmpl-{run_id[:8]}",
+                        "object": "chat.completion.chunk",
+                        "created": 1677652288,
+                        "model": request.model,
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": {"content": line + "\n"},
+                                "finish_reason": None,
+                            }
+                        ],
+                    }
+                    yield f"data: {json.dumps(chunk)}\n\n"
+                    await asyncio.sleep(0.05)
+                yield "data: [DONE]\n\n"
+
+            return StreamingResponse(
+                planner_stream(),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+            )
+        else:
+            return {
+                "id": f"chatcmpl-{run_id[:8]}",
+                "object": "chat.completion",
+                "created": 1677652288,
+                "model": request.model,
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": response_text,
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": len(last_msg.split()),
+                    "completion_tokens": len(response_text.split()),
+                    "total_tokens": len(last_msg.split()) + len(response_text.split()),
+                },
+            }
+
+    # === STANDARD EXECUTOR WORKFLOW ===
     executor_name = "copilot"
     actual_model = None
 
@@ -787,9 +870,7 @@ async def auth_status(request: Request):
     }
 
 
-async def _run_subprocess_async(
-    cmd: List[str], timeout: float = 30
-) -> subprocess.CompletedProcess:
+async def _run_subprocess_async(cmd: List[str], timeout: float = 30) -> subprocess.CompletedProcess:
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd,
