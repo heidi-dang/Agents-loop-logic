@@ -277,6 +277,62 @@ bash scripts/smoke_cli.sh
 powershell -ExecutionPolicy Bypass -File scripts/smoke_cli.ps1
 ```
 
+## Landing Page
+
+The project includes a landing page hosted on Firebase Hosting at [heidi-cli.web.app](https://heidi-cli.web.app).
+
+### Cloning with Submodules
+
+This repository uses git submodules. To clone with all submodules:
+
+```bash
+git clone --recurse-submodules https://github.com/heidi-dang/heidi-cli
+```
+
+Or if you've already cloned:
+```bash
+git submodule update --init --recursive
+```
+
+### Landing Page Development
+
+The landing page is in `heidi-cli-landing-page/`. To run it locally:
+
+```bash
+cd heidi-cli-landing-page
+npm install
+npm run dev
+```
+
+### Firebase Deployment
+
+The landing page has automatic CI/CD via GitHub Actions:
+
+- **Pull Requests**: Deploys to a Firebase preview channel
+- **Merges to main**: Deploys to production live channel
+
+#### Setting Up Firebase CI
+
+1. Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com)
+2. Enable Hosting for your project
+3. Create a service account:
+   - Go to Project Settings → Service Accounts
+   - Click "Generate new private key"
+   - Copy the JSON content
+4. Add the following GitHub Secrets:
+   - `FIREBASE_SERVICE_ACCOUNT_HEIDI_CLI`: The JSON service account key (entire content)
+   - `FIREBASE_PROJECT_ID`: Your Firebase project ID (e.g., `heidi-cli`)
+
+#### Landing Page Environment Variables
+
+For local development, create a `.env.local` file in `heidi-cli-landing-page/`:
+
+```bash
+GEMINI_API_KEY=your-gemini-api-key
+```
+
+Note: `.env.local` is gitignored and should never be committed.
+
 ## License
 
 MIT

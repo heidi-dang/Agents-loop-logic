@@ -1,0 +1,3 @@
+[submodule "heidi-cli-landing-page"]
+	path = heidi-cli-landing-page
+	url = https://github.com/heidi-dang/heidi-cli-landing-page
