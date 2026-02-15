@@ -9,12 +9,21 @@ on:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
+    # This tells every step below to start inside your landing page folder
+    defaults:
+      run:
+        working-directory: ./heidi-cli-landing-page
     steps:
       - uses: actions/checkout@v4
-      - run: npm install && npm run build
+      
+      - name: Install and Build
+        run: npm install && npm run build
+        
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_HEIDI_CLI }}
           channelId: live
           projectId: heidi-cli
+          # This tells the Firebase Action specifically where to find firebase.json
+          entryPoint: ./heidi-cli-landing-page
