@@ -15,6 +15,8 @@ from rich.console import Console
 from rich.progress import SpinnerColumn, TextColumn, Progress
 
 from .config import ConfigManager
+from .render_policy import policy_from_env
+from .streaming import safe_tty
 
 console = Console()
 
@@ -225,19 +227,32 @@ def start_backend(
     add_pid("backend", process.pid)
 
     if wait:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Waiting for backend to be ready...", total=None)
+        policy = policy_from_env()
+        if not policy.allow_live:
             if wait_for_server(host, actual_port, timeout):
-                progress.update(task, completed=True)
                 console.print(f"[green]Backend ready at http://{host}:{actual_port}[/green]")
             else:
                 console.print(f"[red]Backend failed to start within {timeout}s[/red]")
                 process.terminate()
                 raise RuntimeError("Backend failed to start")
+        else:
+            with safe_tty(console):
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    console=console,
+                    transient=True,
+                ) as progress:
+                    task = progress.add_task("Waiting for backend to be ready...", total=None)
+                    if wait_for_server(host, actual_port, timeout):
+                        progress.update(task, completed=True)
+                        console.print(
+                            f"[green]Backend ready at http://{host}:{actual_port}[/green]"
+                        )
+                    else:
+                        console.print(f"[red]Backend failed to start within {timeout}s[/red]")
+                        process.terminate()
+                        raise RuntimeError("Backend failed to start")
 
     return process, actual_port
 

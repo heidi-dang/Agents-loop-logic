@@ -13,6 +13,8 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
 from .config import ConfigManager, check_legacy_heidi_dir, find_project_root, heidi_config_dir
+from .render_policy import policy_from_env
+from .streaming import safe_tty
 
 
 console = Console()
@@ -101,28 +103,44 @@ class SetupWizard:
             console.print(f"[dim]New default is {heidi_config_dir()}[/dim]")
             console.print("[dim]Run 'heidi migrate' later to move config if desired.[/dim]\n")
 
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Creating configuration directories...", total=None)
+        policy = policy_from_env()
 
-            # Create global config directory
+        if not policy.allow_live:
             ConfigManager.ensure_dirs()
 
-            # Ensure secrets file permissions 0600
             secrets_file = ConfigManager.secrets_file()
             if secrets_file.exists():
                 secrets_file.chmod(0o600)
 
-            progress.update(task, description="Ensuring tasks dir exists...")
-
-            # Create tasks dir in project
             tasks_dir = ConfigManager.tasks_dir()
             tasks_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            try:
+                with safe_tty(console):
+                    with Progress(
+                        SpinnerColumn(),
+                        TextColumn("[progress.description]{task.description}"),
+                        console=console,
+                        transient=True,
+                    ) as progress:
+                        task = progress.add_task(
+                            "Creating configuration directories...", total=None
+                        )
 
-            progress.update(task, description="Configuration initialized!")
+                        ConfigManager.ensure_dirs()
+
+                        secrets_file = ConfigManager.secrets_file()
+                        if secrets_file.exists():
+                            secrets_file.chmod(0o600)
+
+                        progress.update(task, description="Ensuring tasks dir exists...")
+
+                        tasks_dir = ConfigManager.tasks_dir()
+                        tasks_dir.mkdir(parents=True, exist_ok=True)
+
+                        progress.update(task, description="Configuration initialized!")
+            except KeyboardInterrupt:
+                raise
 
         console.print("✅ Project state initialized")
 

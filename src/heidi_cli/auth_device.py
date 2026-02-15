@@ -7,6 +7,9 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.panel import Panel
 
+from .render_policy import policy_from_env
+from .streaming import safe_tty
+
 console = Console()
 
 
@@ -52,13 +55,9 @@ async def poll_for_token(
     """Step B: Poll for the access token."""
     start_time = time.time()
 
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    ) as progress:
-        task = progress.add_task("Waiting for authorization...", total=None)
+    policy = policy_from_env()
 
+    if not policy.allow_live:
         while time.time() - start_time < timeout:
             await asyncio.sleep(interval)
 
@@ -77,9 +76,7 @@ async def poll_for_token(
                 continue
 
             data = response.json()
-
             if "access_token" in data:
-                progress.update(task, description="[green]Authorization complete!")
                 return data
 
             error = data.get("error", "")
@@ -88,7 +85,6 @@ async def poll_for_token(
             elif error == "slow_down":
                 interval += 5
             elif error == "expired_token":
-                progress.update(task, description="[red]Authorization timed out")
                 return None
             elif error == "access_denied":
                 console.print("[yellow]Authorization denied by user[/yellow]")
@@ -96,6 +92,56 @@ async def poll_for_token(
             else:
                 console.print(f"[yellow]Error: {error}[/yellow]")
                 return None
+
+        console.print("[red]Authorization timed out[/red]")
+        return None
+
+    with safe_tty(console):
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+            transient=True,
+        ) as progress:
+            task = progress.add_task("Waiting for authorization...", total=None)
+
+            while time.time() - start_time < timeout:
+                await asyncio.sleep(interval)
+
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        "https://github.com/login/oauth/access_token",
+                        data={
+                            "client_id": client_id,
+                            "device_code": device_code,
+                            "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+                        },
+                        headers={"Accept": "application/json"},
+                    )
+
+                if response.status_code != 200:
+                    continue
+
+                data = response.json()
+
+                if "access_token" in data:
+                    progress.update(task, description="[green]Authorization complete!")
+                    return data
+
+                error = data.get("error", "")
+                if error == "authorization_pending":
+                    continue
+                elif error == "slow_down":
+                    interval += 5
+                elif error == "expired_token":
+                    progress.update(task, description="[red]Authorization timed out")
+                    return None
+                elif error == "access_denied":
+                    console.print("[yellow]Authorization denied by user[/yellow]")
+                    return None
+                else:
+                    console.print(f"[yellow]Error: {error}[/yellow]")
+                    return None
 
     console.print("[red]Authorization timed out[/red]")
     return None

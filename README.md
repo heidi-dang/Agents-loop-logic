@@ -263,6 +263,20 @@ pytest -q
 ruff check src
 ```
 
+### Smoke Tests
+
+**Linux/macOS (bash):**
+
+```bash
+bash scripts/smoke_cli.sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/smoke_cli.ps1
+```
+
 ## License
 
 MIT

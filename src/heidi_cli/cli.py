@@ -78,10 +78,23 @@ console = Console()
 class GlobalFlags:
     json_output: bool = False
     verbose: bool = False
+    plain: bool = False
+    no_color: bool = False
+    debug: bool = False
 
-    def __init__(self, json_output: bool = False, verbose: bool = False):
+    def __init__(
+        self,
+        json_output: bool = False,
+        verbose: bool = False,
+        plain: bool = False,
+        no_color: bool = False,
+        debug: bool = False,
+    ):
         self.json_output = json_output
         self.verbose = verbose
+        self.plain = plain
+        self.no_color = no_color
+        self.debug = debug
 
 
 def get_version() -> str:
@@ -165,19 +178,36 @@ def main(
     ctx: typer.Context,
     version: bool = typer.Option(False, "--version", help="Show version"),
     json_flag: bool = typer.Option(False, "--json", help="Output JSON"),
+    plain: bool = typer.Option(False, "--plain", help="Disable live/progress rendering"),
+    no_color: bool = typer.Option(False, "--no-color", help="Disable color output"),
+    debug: bool = typer.Option(False, "--debug", help="Debug logging / tracebacks"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose logging"),
 ) -> None:
     global _global_json_output
     _global_json_output = json_flag
 
-    flags = GlobalFlags(json_output=json_flag, verbose=verbose)
+    flags = GlobalFlags(
+        json_output=json_flag,
+        verbose=verbose,
+        plain=plain,
+        no_color=no_color,
+        debug=debug,
+    )
     ctx.obj = flags
+
+    if plain:
+        os.environ["HEIDI_PLAIN"] = "1"
+    if no_color:
+        os.environ["HEIDI_NO_COLOR"] = "1"
+        os.environ["NO_COLOR"] = "1"
+    if debug:
+        os.environ["HEIDI_DEBUG"] = "1"
 
     if version:
         console.print(f"Heidi CLI v{get_version()}")
         raise typer.Exit(0)
 
-    if verbose:
+    if debug or verbose:
         setup_global_logging("DEBUG")
 
     import os

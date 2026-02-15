@@ -12,6 +12,8 @@ from rich.prompt import Prompt
 
 from .orchestrator.executors import pick_executor, ExecResult
 from .config import ConfigManager
+from .render_policy import policy_from_env
+from .streaming import safe_tty
 
 console = Console()
 
@@ -134,7 +136,14 @@ async def start_chat_repl(executor_name: str, model: Optional[str] = None, reset
 
             session.add_user_message(user_input)
 
-            with console.status(f"[bold cyan]{executor_name} is thinking...[/bold cyan]"):
+            policy = policy_from_env()
+            if policy.allow_live:
+                with safe_tty(console):
+                    with console.status(
+                        f"[bold cyan]{executor_name} is thinking...[/bold cyan]"
+                    ):
+                        response = await session.send(user_input)
+            else:
                 response = await session.send(user_input)
 
             session.add_assistant_message(response)
