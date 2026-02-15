@@ -3,12 +3,92 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from ..config import ConfigManager
 from ..logging import HeidiLogger, redact_secrets
+
+
+@dataclass
+class AuditDecision:
+    status: str  # PASS or FAIL
+    why: str = ""
+    blocking_issues: list = None
+    non_blocking: list = None
+    rerun_commands: list = None
+    recommended_next_step: str = ""
+
+    def __post_init__(self):
+        if self.blocking_issues is None:
+            self.blocking_issues = []
+        if self.non_blocking is None:
+            self.non_blocking = []
+        if self.rerun_commands is None:
+            self.rerun_commands = []
+
+
+def parse_audit_decision(text: str) -> AuditDecision:
+    """Parse AUDIT_DECISION block from reviewer output."""
+    decision = AuditDecision(status="FAIL", why="Could not parse audit decision")
+
+    # Extract AUDIT_DECISION block
+    match = re.search(r"AUDIT_DECISION:(.*?)(?:END_AUDIT_DECISION|$)", text, re.DOTALL)
+    if not match:
+        # Fall back to simple PASS/FAIL detection
+        if "PASS" in text and "FAIL" not in text:
+            decision.status = "PASS"
+            decision.why = "PASS found in output"
+            return decision
+        elif "FAIL" in text:
+            decision.status = "FAIL"
+            decision.why = "FAIL found in output"
+            return decision
+        return decision
+
+    block = match.group(1)
+
+    # Parse status
+    status_match = re.search(r"status:\s*(PASS|FAIL)", block, re.IGNORECASE)
+    if status_match:
+        decision.status = status_match.group(1).upper()
+
+    # Parse why
+    why_match = re.search(r"why:\s*(.+?)(?:\n|$)", block)
+    if why_match:
+        decision.why = why_match.group(1).strip()
+
+    # Parse blocking_issues
+    issues_match = re.search(r"blocking_issues:\s*(.+?)(?:\n\w|\Z)", block, re.DOTALL)
+    if issues_match:
+        issues_text = issues_match.group(1)
+        decision.blocking_issues = [
+            i.strip().lstrip("- ").strip() for i in issues_text.split("\n") if i.strip()
+        ]
+
+    # Parse non_blocking
+    non_blocking_match = re.search(r"non_blocking:\s*(.+?)(?:\n\w|\Z)", block, re.DOTALL)
+    if non_blocking_match:
+        non_blocking_text = non_blocking_match.group(1)
+        decision.non_blocking = [
+            i.strip().lstrip("- ").strip() for i in non_blocking_text.split("\n") if i.strip()
+        ]
+
+    # Parse rerun_commands
+    rerun_match = re.search(r"rerun_commands:\s*(.+?)(?:\n\w|\Z)", block, re.DOTALL)
+    if rerun_match:
+        rerun_text = rerun_match.group(1)
+        decision.rerun_commands = [
+            i.strip().lstrip("- ").strip() for i in rerun_text.split("\n") if i.strip()
+        ]
+
+    # Parse recommended_next_step
+    next_step_match = re.search(r"recommended_next_step:\s*(.+?)(?:\n|\Z)", block)
+    if next_step_match:
+        decision.recommended_next_step = next_step_match.group(1).strip()
+
+    return decision
 
 
 @dataclass
@@ -18,8 +98,8 @@ class TaskArtifact:
     audit_content: str = ""
     progress_content: str = ""
     status: str = "pending"
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
     def save(self) -> Path:
         tasks_dir = ConfigManager.tasks_dir()
@@ -35,7 +115,7 @@ class TaskArtifact:
             "slug": self.slug,
             "status": self.status,
             "created_at": self.created_at,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
         }
         (tasks_dir / f"{self.slug}.meta.json").write_text(json.dumps(meta, indent=2))
 
@@ -77,7 +157,7 @@ def sanitize_slug(text: str) -> str:
 def create_task_artifact(task: str) -> TaskArtifact:
     slug = sanitize_slug(task)
     artifact = TaskArtifact(
-        slug=slug, content=f"# Task: {task}\n\nCreated: {datetime.now(timezone.utc).isoformat()}\n"
+        slug=slug, content=f"# Task: {task}\n\nCreated: {datetime.utcnow().isoformat()}\n"
     )
     artifact.save()
     HeidiLogger.write_event("task_created", {"slug": slug, "task": task})
@@ -87,7 +167,7 @@ def create_task_artifact(task: str) -> TaskArtifact:
 def update_task_progress(slug: str, progress: str) -> None:
     artifact = TaskArtifact.load(slug)
     if artifact:
-        artifact.progress_content += f"\n{datetime.now(timezone.utc).isoformat()}: {progress}"
+        artifact.progress_content += f"\n{datetime.utcnow().isoformat()}: {progress}"
         artifact.save()
         HeidiLogger.write_event("progress_update", {"slug": slug, "progress": progress})
 
@@ -96,7 +176,7 @@ def update_task_audit(slug: str, audit_result: str, passed: bool) -> None:
     artifact = TaskArtifact.load(slug)
     if artifact:
         artifact.audit_content += (
-            f"\n{datetime.now(timezone.utc).isoformat()} - {'PASS' if passed else 'FAIL'}: {audit_result}"
+            f"\n{datetime.utcnow().isoformat()} - {'PASS' if passed else 'FAIL'}: {audit_result}"
         )
         artifact.status = "passed" if passed else "failed"
         artifact.save()
@@ -105,7 +185,7 @@ def update_task_audit(slug: str, audit_result: str, passed: bool) -> None:
         )
 
 
-def save_audit_to_task(slug: str, decision) -> None:
+def save_audit_to_task(slug: str, decision: AuditDecision) -> None:
     """Save audit decision to the task audit file."""
     tasks_dir = ConfigManager.tasks_dir()
     tasks_dir.mkdir(parents=True, exist_ok=True)
@@ -126,7 +206,7 @@ Why: {decision.why}
 {decision.recommended_next_step}
 
 ## Timestamp
-{datetime.now(timezone.utc).isoformat()}
+{datetime.utcnow().isoformat()}
 """
     audit_file = tasks_dir / f"{slug}.audit.md"
     audit_file.write_text(redact_secrets(content))

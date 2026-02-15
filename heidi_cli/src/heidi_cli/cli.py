@@ -32,16 +32,22 @@ Common commands:
 """,
 )
 copilot_app = typer.Typer(help="Copilot (Copilot CLI via GitHub Copilot SDK)")
+jules_app = typer.Typer(help="Jules (Google's coding agent)")
+opencode_app = typer.Typer(help="OpenCode (Open source AI coding assistant)")
+ollama_app = typer.Typer(help="Ollama (Local LLM runner)")
 auth_app = typer.Typer(help="Authentication commands")
 agents_app = typer.Typer(help="Agent management")
 valves_app = typer.Typer(help="Configuration valves")
 persona_app = typer.Typer(help="Persona management")
 start_app = typer.Typer(help="Start services (UI, backend, etc.)", no_args_is_help=True)
 connect_app = typer.Typer(help="Connect to external services (Ollama, OpenCode)")
-opencode_app = typer.Typer(help="OpenCode connections (local, server, OpenAI)")
+opencode_connect_app = typer.Typer(help="OpenCode connections (local, server, OpenAI)")
 ui_mgmt_app = typer.Typer(help="UI build and management")
 
 app.add_typer(copilot_app, name="copilot")
+app.add_typer(jules_app, name="jules")
+app.add_typer(opencode_app, name="opencode")
+app.add_typer(ollama_app, name="ollama")
 app.add_typer(auth_app, name="auth")
 app.add_typer(agents_app, name="agents")
 app.add_typer(valves_app, name="valves")
@@ -49,7 +55,7 @@ app.add_typer(openwebui_app, name="openwebui")
 app.add_typer(persona_app, name="persona")
 app.add_typer(start_app, name="start")
 app.add_typer(connect_app, name="connect")
-app.add_typer(opencode_app, name="opencode")
+app.add_typer(opencode_connect_app, name="opencode_connect") # Internal alias to avoid conflict
 app.add_typer(ui_mgmt_app, name="ui")
 
 console = Console()
@@ -70,34 +76,62 @@ def print_json(data: Any) -> None:
 
 def open_url(url: str) -> None:
     """Open URL in browser - WSL/Linux/Windows compatible."""
+    success = False
+
     if sys.platform == "win32":
-        subprocess.run(["powershell.exe", "-Command", f"Start-Process '{url}'"], check=False)
-        return
+        res = subprocess.run(
+            ["powershell.exe", "-Command", f"Start-Process '{url}'"], check=False
+        )
+        if res.returncode == 0:
+            success = True
     elif shutil.which("wslview"):
-        subprocess.run(["wslview", url], check=False)
-        return
+        res = subprocess.run(["wslview", url], check=False)
+        if res.returncode == 0:
+            success = True
     elif shutil.which("sensible-browser"):
-        subprocess.run(["sensible-browser", url], check=False)
-        return
+        res = subprocess.run(["sensible-browser", url], check=False)
+        if res.returncode == 0:
+            success = True
     elif shutil.which("xdg-open"):
-        subprocess.run(["xdg-open", url], check=False)
-        return
+        res = subprocess.run(["xdg-open", url], check=False)
+        if res.returncode == 0:
+            success = True
     elif shutil.which("gnome-open"):
-        subprocess.run(["gnome-open", url], check=False)
-        return
+        res = subprocess.run(["gnome-open", url], check=False)
+        if res.returncode == 0:
+            success = True
     elif shutil.which("gio"):
-        result = subprocess.run(["gio", "open", url], check=False)
-        if result.returncode == 0:
-            return
+        res = subprocess.run(["gio", "open", url], check=False)
+        if res.returncode == 0:
+            success = True
+
+    if success:
+        return
 
     # Try webbrowser as last resort
     try:
         import webbrowser
 
-        webbrowser.open(url)
+        if webbrowser.open(url):
+            return
     except Exception:
-        console.print("[yellow]Could not open browser automatically.[/yellow]")
-        console.print(f"[cyan]Open manually: {url}[/cyan]")
+        pass
+
+    # Fallback with helpful instructions
+    console.print(
+        Panel.fit(
+            f"[yellow]Couldn't find a suitable web browser![/yellow]\n\n"
+            f"Next steps:\n"
+            f"1. Open this URL manually:\n   [bold cyan]{url}[/bold cyan]\n\n"
+            f"2. Copy to clipboard:\n"
+            f"   [dim]macOS:[/dim]   echo '{url}' | pbcopy\n"
+            f"   [dim]Linux:[/dim]   echo '{url}' | xclip -sel clip\n"
+            f"   [dim]Windows:[/dim] echo {url} | clip\n\n"
+            f"3. Fix for next time:\n"
+            f"   export BROWSER='/usr/bin/firefox'",
+            title="Browser Error",
+        )
+    )
 
 
 @app.callback()
@@ -551,7 +585,7 @@ def connect_opencode(
         raise typer.Exit(1)
 
 
-@opencode_app.command("openai")
+@opencode_connect_app.command("openai")
 def connect_opencode_openai(
     verify: bool = typer.Option(False, "--verify", help="Only verify existing connection"),
     reconnect: bool = typer.Option(False, "--reconnect", help="Force re-auth even if connected"),
@@ -1106,49 +1140,51 @@ def copilot_login(
 
 @copilot_app.command("chat")
 def copilot_chat(
-    prompt: str,
+    prompt: Optional[str] = typer.Argument(None, help="Initial prompt"),
     model: Optional[str] = None,
-    timeout: int = typer.Option(120, help="Timeout in seconds"),
+    reset: bool = typer.Option(False, "--reset", help="Reset chat history"),
 ) -> None:
-    """Send a single prompt and print the assistant response."""
-    from .copilot_runtime import CopilotRuntime
-    from .logging import redact_secrets
-    from .orchestrator.artifacts import TaskArtifact
-    from datetime import datetime, timezone
+    """Chat with Copilot (interactive multi-turn)."""
+    from .chat import start_chat_repl
 
-    slug = prompt[:50].lower().replace(" ", "_")
-    artifact = TaskArtifact(slug=f"chat_{slug}")
-    artifact.content = f"# Chat: {prompt}\n\nCreated: {datetime.now(timezone.utc).isoformat()}\n\n"
+    # If prompt is provided, we can maybe initialize the chat with it
+    # But currently start_chat_repl is fully interactive.
+    # We will just start the REPL.
 
-    async def _run():
-        rt = CopilotRuntime(model=model)
-        try:
-            await rt.start()
-            try:
-                text = await rt.send_and_wait(prompt, timeout_s=timeout)
-                console.print(text)
-                sys.stdout.flush()
-                artifact.content += f"## Response\n{text}\n"
-                artifact.status = "completed"
-            except asyncio.TimeoutError:
-                console.print(f"[yellow]Chat timed out after {timeout} seconds[/yellow]")
-                artifact.content += f"## Error\nTimed out after {timeout} seconds\n"
-                artifact.status = "failed"
-                raise typer.Exit(1)
-            except Exception as e:
-                console.print(f"[red]Chat error: {redact_secrets(str(e))}[/red]")
-                artifact.content += f"## Error\n{str(e)}\n"
-                artifact.status = "failed"
-                raise typer.Exit(1)
-        except Exception as e:
-            console.print(f"[red]Failed to start Copilot: {redact_secrets(str(e))}[/red]")
-            artifact.status = "failed"
-            raise typer.Exit(1)
-        finally:
-            await rt.stop()
-            artifact.save()
+    if prompt:
+        console.print("[yellow]Note: Multi-turn chat starting. Initial prompt is ignored in this mode for now.[/yellow]")
 
-    asyncio.run(_run())
+    asyncio.run(start_chat_repl("copilot", model=model, reset=reset))
+
+
+@jules_app.command("chat")
+def jules_chat(
+    model: Optional[str] = None,
+    reset: bool = typer.Option(False, "--reset", help="Reset chat history"),
+) -> None:
+    """Chat with Jules (interactive multi-turn)."""
+    from .chat import start_chat_repl
+    asyncio.run(start_chat_repl("jules", model=model, reset=reset))
+
+
+@opencode_app.command("chat")
+def opencode_chat(
+    model: Optional[str] = None,
+    reset: bool = typer.Option(False, "--reset", help="Reset chat history"),
+) -> None:
+    """Chat with OpenCode (interactive multi-turn)."""
+    from .chat import start_chat_repl
+    asyncio.run(start_chat_repl("opencode", model=model, reset=reset))
+
+
+@ollama_app.command("chat")
+def ollama_chat(
+    model: str = typer.Option("llama3", help="Model name"),
+    reset: bool = typer.Option(False, "--reset", help="Reset chat history"),
+) -> None:
+    """Chat with Ollama (interactive multi-turn)."""
+    from .chat import start_chat_repl
+    asyncio.run(start_chat_repl("ollama", model=model, reset=reset))
 
 
 @agents_app.command("list")
@@ -1211,7 +1247,8 @@ def valves_set(key: str, value: str) -> None:
 @app.command("loop")
 def loop(
     task: str,
-    executor: str = typer.Option("copilot", help="copilot | jules | opencode"),
+    planner_executor: str = typer.Option("copilot", "--planner-executor", help="Executor for Planner agent"),
+    executor: str = typer.Option(None, "--executor", help="Alias for --planner-executor (deprecated)"),
     max_retries: int = typer.Option(2, help="Max re-plans after FAIL"),
     workdir: Path = typer.Option(Path.cwd(), help="Repo working directory"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Generate plan but don't apply changes"),
@@ -1224,6 +1261,14 @@ def loop(
     no_live: bool = typer.Option(False, "--no-live", help="Disable streaming UI"),
 ) -> None:
     """Run: Plan -> execute handoffs -> audit -> PASS/FAIL (starter loop)."""
+
+    # Handle executor alias
+    if executor:
+        console.print("[yellow]Warning: --executor is deprecated and now alias for --planner-executor.[/yellow]")
+        console.print("[dim]Execution executors are now controlled by the Planner's routing.[/dim]")
+        if not planner_executor or planner_executor == "copilot":
+            planner_executor = executor
+
     config = ConfigManager.load_config()
     config.persona = persona
     ConfigManager.save_config(config)
@@ -1242,7 +1287,7 @@ def loop(
     if dry_run:
         console.print("[yellow]DRY RUN MODE[/yellow]")
         console.print(f"Task: {task}")
-        console.print(f"Executor: {executor}")
+        console.print(f"Planner Executor: {planner_executor}")
         console.print("")
 
         async def _dry_run():
@@ -1257,7 +1302,7 @@ def loop(
 
             result = await run_loop(
                 task=task,
-                executor=executor,
+                executor=planner_executor,
                 max_retries=0,
                 workdir=workdir,
                 dry_run=True,
@@ -1271,7 +1316,7 @@ def loop(
             {
                 "run_id": run_id,
                 "task": task,
-                "executor": executor,
+                "executor": planner_executor,
                 "max_retries": 0,
                 "workdir": str(workdir),
                 "dry_run": True,
@@ -1296,19 +1341,21 @@ def loop(
         {
             "run_id": run_id,
             "task": task,
-            "executor": executor,
+            "executor": planner_executor,
             "max_retries": max_retries,
             "workdir": str(workdir),
         }
     )
 
     console.print(f"[cyan]Starting loop {run_id}: {task}[/cyan]")
-    HeidiLogger.emit_status(f"Loop started with executor={executor}")
+    HeidiLogger.emit_status(f"Loop started with planner={planner_executor}")
 
     async def _run():
         try:
+            # We pass planner_executor as 'executor' to run_loop for now until we refactor run_loop
+            # run_loop will need to be updated to respect routing for downstream execution
             result = await run_loop(
-                task=task, executor=executor, max_retries=max_retries, workdir=workdir
+                task=task, executor=planner_executor, max_retries=max_retries, workdir=workdir
             )
             HeidiLogger.emit_result(result)
             console.print(Panel.fit(result, title=f"Loop {run_id} Result"))
@@ -1356,11 +1403,11 @@ def run(
     run_id = HeidiLogger.init_run()
 
     from .orchestrator.artifacts import TaskArtifact
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     slug = prompt[:50].lower().replace(" ", "_")
     artifact = TaskArtifact(slug=f"run_{slug}")
-    artifact.content = f"# Run: {prompt}\n\nCreated: {datetime.now(timezone.utc).isoformat()}\n\nExecutor: {executor}\nWorkdir: {workdir}\n\n"
+    artifact.content = f"# Run: {prompt}\n\nCreated: {datetime.utcnow().isoformat()}\n\nExecutor: {executor}\nWorkdir: {workdir}\n\n"
 
     HeidiLogger.write_run_meta(
         {
@@ -1539,7 +1586,7 @@ def backups_cmd(
 
 @app.command("serve")
 def serve(
-    host: str = typer.Option("0.0.0.0", help="Host to bind to"),
+    host: str = typer.Option("127.0.0.1", help="Host to bind to"),
     port: int = typer.Option(7777, help="Port to bind to"),
     ui: bool = typer.Option(False, "--ui", help="Also start UI"),
     force: bool = typer.Option(False, "--force", "-f", help="Kill existing server if running"),
@@ -2008,7 +2055,7 @@ def stop_cmd(
 
 @start_app.command("server")
 def start_server_cmd(
-    host: str = typer.Option("0.0.0.0", "--host", help="Host to bind to"),
+    host: str = typer.Option("127.0.0.1", "--host", help="Host to bind to"),
     port: int = typer.Option(7777, "--port", help="Port to bind to"),
 ) -> None:
     """Start the Heidi API server only (without UI)."""
