@@ -210,9 +210,6 @@ def main(
     if debug or verbose:
         setup_global_logging("DEBUG")
 
-    import os
-    import sys
-
     if ctx.invoked_subcommand is None:
         return
 
