@@ -1,6 +1,6 @@
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from fastapi import HTTPException
 from heidi_cli.server import validate_run_id, app
 from fastapi.testclient import TestClient
