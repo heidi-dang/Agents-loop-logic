@@ -79,8 +79,15 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOW_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "X-Heidi-Key",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+    ],
 )
 
 app.add_middleware(AuthMiddleware)
@@ -93,9 +100,11 @@ def _check_auth(request: Request, stream_key: Optional[str] = None) -> bool:
 
     Returns True if authorized, False otherwise.
     """
+    # AuthMiddleware now handles API key validation and sets request.state.user
     if hasattr(request.state, "user") and request.state.user is not None:
         return True
 
+    # Fallback for manual check if middleware didn't catch it (e.g. key mismatch)
     if not HEIDI_API_KEY:
         return False
 
@@ -105,8 +114,6 @@ def _check_auth(request: Request, stream_key: Optional[str] = None) -> bool:
 
 
 def _require_api_key(request: Request, stream_key: Optional[str] = None) -> None:
-    if not HEIDI_API_KEY:
-        return
     if not _check_auth(request, stream_key):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -138,7 +145,22 @@ async def serve_ui(path: str):
             status_code=200,
         )
 
-    file_path = UI_DIST / path
+    # Security check: Ensure path doesn't traverse outside UI_DIST
+    try:
+        file_path = (UI_DIST / path).resolve()
+        if not file_path.is_relative_to(UI_DIST.resolve()):
+            # Path traversal attempt
+            return HTMLResponse(
+                "<html><body><h1>404</h1><p>File not found</p></body></html>",
+                status_code=404,
+            )
+    except Exception:
+        # Handle path resolution errors safely
+        return HTMLResponse(
+            "<html><body><h1>404</h1><p>File not found</p></body></html>",
+            status_code=404,
+        )
+
     if file_path.is_file():
         from starlette.responses import FileResponse
 
@@ -319,6 +341,7 @@ class RunRequest(BaseModel):
     executor: str = "copilot"
     model: Optional[str] = None
     workdir: Optional[str] = None
+    dry_run: bool = False
 
 
 class LoopRequest(BaseModel):
@@ -327,6 +350,7 @@ class LoopRequest(BaseModel):
     model: Optional[str] = None
     max_retries: int = 2
     workdir: Optional[str] = None
+    dry_run: bool = False
 
 
 class RunResponse(BaseModel):
@@ -348,6 +372,7 @@ class ChatResponse(BaseModel):
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, http_request: Request):
     """Simple chat endpoint - no artifacts, no planning, just response."""
+    _require_api_key(http_request)
     from .orchestrator.loop import pick_executor
 
     try:
@@ -376,8 +401,17 @@ async def run(request: RunRequest, http_request: Request):
             "executor": request.executor,
             "workdir": str(workdir),
             "status": "running",
+            "dry_run": request.dry_run,
         }
     )
+
+    if request.dry_run:
+        HeidiLogger.write_run_meta(
+            {"status": "completed", "result": "Dry run: Execution skipped."}
+        )
+        return RunResponse(
+            run_id=run_id, status="completed", result="Dry run: Execution skipped."
+        )
 
     try:
         executor = pick_executor(request.executor, model=request.model)
@@ -410,6 +444,7 @@ async def loop(request: LoopRequest, http_request: Request):
             "max_retries": request.max_retries,
             "workdir": str(workdir),
             "status": "running",
+            "dry_run": request.dry_run,
         }
     )
 
@@ -421,6 +456,7 @@ async def loop(request: LoopRequest, http_request: Request):
                 model=request.model,
                 max_retries=request.max_retries,
                 workdir=workdir,
+                dry_run=request.dry_run,
             )
             HeidiLogger.write_run_meta({"status": "completed", "result": result})
         except Exception as e:
@@ -667,7 +703,7 @@ async def chat_completions(request: ChatCompletionRequest, http_request: Request
         return {"error": {"message": str(e), "type": "invalid_request_error"}}
 
 
-def start_server(host: str = "0.0.0.0", port: int = 7777):
+def start_server(host: str = "127.0.0.1", port: int = 7777):
     uvicorn.run(app, host=host, port=port)
 
 
