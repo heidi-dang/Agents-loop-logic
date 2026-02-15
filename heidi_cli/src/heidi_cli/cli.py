@@ -2190,6 +2190,7 @@ def start_openwebui_cmd(
         port=port,
         data_volume=data_volume,
         network=network,
+        env_vars={"PORT": str(port)},
     ):
         url = f"http://localhost:{port}"
         console.print(
