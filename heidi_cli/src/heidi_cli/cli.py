@@ -55,7 +55,7 @@ app.add_typer(openwebui_app, name="openwebui")
 app.add_typer(persona_app, name="persona")
 app.add_typer(start_app, name="start")
 app.add_typer(connect_app, name="connect")
-app.add_typer(opencode_connect_app, name="opencode_connect") # Internal alias to avoid conflict
+app.add_typer(opencode_connect_app, name="opencode_connect")  # Internal alias to avoid conflict
 app.add_typer(ui_mgmt_app, name="ui")
 
 console = Console()
@@ -79,9 +79,7 @@ def open_url(url: str) -> None:
     success = False
 
     if sys.platform == "win32":
-        res = subprocess.run(
-            ["powershell.exe", "-Command", f"Start-Process '{url}'"], check=False
-        )
+        res = subprocess.run(["powershell.exe", "-Command", f"Start-Process '{url}'"], check=False)
         if res.returncode == 0:
             success = True
     elif shutil.which("wslview"):
@@ -1152,7 +1150,9 @@ def copilot_chat(
     # We will just start the REPL.
 
     if prompt:
-        console.print("[yellow]Note: Multi-turn chat starting. Initial prompt is ignored in this mode for now.[/yellow]")
+        console.print(
+            "[yellow]Note: Multi-turn chat starting. Initial prompt is ignored in this mode for now.[/yellow]"
+        )
 
     asyncio.run(start_chat_repl("copilot", model=model, reset=reset))
 
@@ -1164,6 +1164,7 @@ def jules_chat(
 ) -> None:
     """Chat with Jules (interactive multi-turn)."""
     from .chat import start_chat_repl
+
     asyncio.run(start_chat_repl("jules", model=model, reset=reset))
 
 
@@ -1174,6 +1175,7 @@ def opencode_chat(
 ) -> None:
     """Chat with OpenCode (interactive multi-turn)."""
     from .chat import start_chat_repl
+
     asyncio.run(start_chat_repl("opencode", model=model, reset=reset))
 
 
@@ -1184,6 +1186,7 @@ def ollama_chat(
 ) -> None:
     """Chat with Ollama (interactive multi-turn)."""
     from .chat import start_chat_repl
+
     asyncio.run(start_chat_repl("ollama", model=model, reset=reset))
 
 
@@ -1247,8 +1250,12 @@ def valves_set(key: str, value: str) -> None:
 @app.command("loop")
 def loop(
     task: str,
-    planner_executor: str = typer.Option("copilot", "--planner-executor", help="Executor for Planner agent"),
-    executor: str = typer.Option(None, "--executor", help="Alias for --planner-executor (deprecated)"),
+    planner_executor: str = typer.Option(
+        "copilot", "--planner-executor", help="Executor for Planner agent"
+    ),
+    executor: str = typer.Option(
+        None, "--executor", help="Alias for --planner-executor (deprecated)"
+    ),
     max_retries: int = typer.Option(2, help="Max re-plans after FAIL"),
     workdir: Path = typer.Option(Path.cwd(), help="Repo working directory"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Generate plan but don't apply changes"),
@@ -1264,7 +1271,9 @@ def loop(
 
     # Handle executor alias
     if executor:
-        console.print("[yellow]Warning: --executor is deprecated and now alias for --planner-executor.[/yellow]")
+        console.print(
+            "[yellow]Warning: --executor is deprecated and now alias for --planner-executor.[/yellow]"
+        )
         console.print("[dim]Execution executors are now controlled by the Planner's routing.[/dim]")
         if not planner_executor or planner_executor == "copilot":
             planner_executor = executor
@@ -1613,14 +1622,24 @@ def serve(
     backend_thread.start()
 
     if ui:
-        # Check for cached UI first, then fallback to ./ui
-        xdg_cache = os.getenv("XDG_CACHE_HOME", str(Path.home() / ".cache"))
-        ui_cache = Path(xdg_cache) / "heidi" / "ui" / "dist"
-        ui_path = Path.cwd() / "ui"
+        # Check for cached UI in heidi_ui_dir(), then fallback to package ui_dist
+        from .config import heidi_ui_dir
+
+        ui_cache = heidi_ui_dir() / "dist"
+        ui_path = Path.cwd() / "ui"  # Dev fallback only
+
+        # Check priority: cache > packaged ui_dist > cwd/ui
         use_cached = ui_cache.exists()
+
+        # Also check for packaged ui_dist in the python package
+        packaged_ui = Path(__file__).parent / "ui_dist"
+        use_packaged = packaged_ui.exists()
 
         if use_cached:
             console.print(f"[green]Using cached UI: {ui_cache}[/green]")
+            console.print(f"[green]UI served at: http://localhost:{port}/ui/[/green]")
+        elif use_packaged:
+            console.print(f"[green]Using packaged UI: {packaged_ui}[/green]")
             console.print(f"[green]UI served at: http://localhost:{port}/ui/[/green]")
         elif not ui_path.exists():
             console.print("[yellow]UI not found. Run: heidi ui build[/yellow]")
@@ -1644,6 +1663,8 @@ def serve(
             ui_thread.start()
 
         if use_cached:
+            ui_url = f"http://localhost:{port}/ui/"
+        elif use_packaged:
             ui_url = f"http://localhost:{port}/ui/"
         else:
             ui_url = "http://localhost:3002"

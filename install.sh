@@ -2,32 +2,10 @@
 set -e
 
 # Heidi CLI One-Click Installer for Linux/macOS
-# Clones repo and installs in editable mode with venv
+# Uses pipx for global installation so heidi is available from any directory
 
-# Save terminal state for cleanup
-ORIG_STTY=""
-if [ -t 0 ]; then
-    ORIG_STTY="$(stty -g 2>/dev/null || true)"
-fi
-
-# Prevent Ctrl+S freeze during install
-stty -ixon 2>/dev/null || true
-
-# Cleanup function to restore terminal state
-cleanup() {
-    if [ -n "$ORIG_STTY" ]; then
-        stty "$ORIG_STTY" 2>/dev/null || true
-    else
-        stty sane 2>/dev/null || true
-        stty echo 2>/dev/null || true
-    fi
-    tput cnorm 2>/dev/null || true
-}
-
-trap cleanup EXIT INT TERM
-
-echo "Heidi CLI Installer"
-echo "===================="
+echo "Heidi CLI Installer (pipx mode)"
+echo "================================"
 
 # Check if Python is available
 if ! command -v python3 &> /dev/null && ! command -v python &> /dev/null; then
@@ -56,194 +34,28 @@ fi
 
 echo "Python version: $PYTHON_VERSION"
 
-# Initial setup: Check for existing installation
-INSTALL_DIR="$HOME/heidi-cli"
-EXISTING_INSTALL=false
-EXISTING_VENV=false
-
-# Check for existing installation directory
-if [ -d "$INSTALL_DIR" ]; then
-    EXISTING_INSTALL=true
-fi
-
-# Check for existing venv in common locations
-for dir in "$INSTALL_DIR/heidi_cli" "$HOME/.local/heidi-cli" "."; do
-    if [ -d "$dir/.venv" ] || [ -d "$dir/venv" ]; then
-        EXISTING_VENV=true
-        break
-    fi
-done
-
-# Check if heidi command is available (in PATH)
-if command -v heidi &> /dev/null; then
+# Check if pipx is installed
+if ! command -v pipx &> /dev/null; then
     echo ""
-    echo "Heidi CLI is already installed!"
-    EXISTING_INSTALL=true
-fi
-
-# Prompt for action if existing installation found
-if [ "$EXISTING_INSTALL" = true ] || [ "$EXISTING_VENV" = true ]; then
-    echo ""
-    echo "Found existing Heidi CLI installation."
-    echo ""
-    echo "Options:"
-    echo "  [1] Uninstall and reinstall (fresh install)"
-    echo "  [2] Update existing installation"
-    echo "  [3] Cancel"
-    echo ""
-    read -r -p "Choose option [1]: " choice < /dev/tty
-    choice=${choice:-1}
-
-    case $choice in
-        1)
-            echo ""
-            echo "Uninstalling existing installation..."
-
-            # Remove existing installation directory
-            if [ -d "$INSTALL_DIR" ]; then
-                rm -rf "$INSTALL_DIR"
-            fi
-
-            # Remove venv in current directory if exists
-            if [ -d ".venv" ]; then
-                rm -rf .venv
-            fi
-            if [ -d "venv" ]; then
-                rm -rf venv
-            fi
-
-            # Try to find and remove venv in common locations
-            for dir in "$HOME/.local/heidi-cli"; do
-                if [ -d "$dir/.venv" ] || [ -d "$dir/venv" ]; then
-                    rm -rf "$dir"
-                fi
-            done
-
-            echo "Existing installation removed."
-            ;;
-        2)
-            echo ""
-            echo "Updating existing installation..."
-
-            if [ -d "$INSTALL_DIR" ]; then
-                cd "$INSTALL_DIR"
-                git pull origin main
-                if [ -d "heidi_cli/.venv" ]; then
-                    cd heidi_cli
-                    source .venv/bin/activate
-                    pip install -e ".[dev]" -q
-                fi
-                echo ""
-                echo "Heidi CLI updated successfully!"
-                echo ""
-                echo "To activate, run:"
-                echo "  cd $INSTALL_DIR/heidi_cli && source .venv/bin/activate"
-                exit 0
-            fi
-            ;;
-        3)
-            echo "Cancelled."
-            exit 0
-            ;;
-        *)
-            echo "Invalid option. Cancelling."
-            exit 1
-            ;;
-    esac
-fi
-
-# Create installation directory
-mkdir -p "$INSTALL_DIR"
-cd "$INSTALL_DIR"
-
-# Clone repo directly into INSTALL_DIR (not a nested folder)
-if [ -d ".git" ]; then
-    echo "Repo already exists, pulling latest..."
-    git pull origin main
-else
-    echo ""
-    echo "Cloning heidi-cli..."
-    rm -rf ./*
-    git clone https://github.com/heidi-dang/heidi-cli.git .
-fi
-cd heidi_cli
-
-# Create virtual environment
-echo "Creating virtual environment..."
-$PYTHON_CMD -m venv .venv
-source .venv/bin/activate
-
-# Upgrade pip
-echo "Installing dependencies..."
-pip install --upgrade pip -q
-
-# Install in editable mode
-pip install -e ".[dev]" -q
-
-# Setup UI
-echo ""
-echo "Setting up UI..."
-
-# Determine UI directory
-if [ -n "$HEIDI_HOME" ]; then
-    UI_DIR="$HEIDI_HOME/ui"
-else
-    CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}"
-    UI_DIR="$CACHE_DIR/heidi/ui"
-fi
-
-# Safety check
-if [ ! -f "$INSTALL_DIR/ui/package.json" ]; then
-    echo "ERROR: UI not bundled in heidi-cli. Expected $INSTALL_DIR/ui/package.json"
-    exit 1
-fi
-
-# Version info
-UI_VERSION=$(git -C "$INSTALL_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
-echo "UI source: $INSTALL_DIR/ui"
-echo "UI version: $UI_VERSION"
-echo "UI dest: $UI_DIR"
-
-# Copy UI source
-mkdir -p "$(dirname "$UI_DIR")"
-rm -rf "$UI_DIR"
-cp -r "$INSTALL_DIR/ui" "$UI_DIR"
-echo "UI installed."
-
-# Build UI for server
-echo "Building UI..."
-cd "$UI_DIR"
-npm install --silent 2>/dev/null || true
-npm run build 2>/dev/null || echo "Warning: UI build failed, using source"
-
-# Copy built UI to server's ui_dist
-UI_DIST="$INSTALL_DIR/heidi_cli/src/heidi_cli/ui_dist"
-mkdir -p "$UI_DIST"
-rm -rf "$UI_DIST"/*
-cp -r "$UI_DIR/dist"/* "$UI_DIST/" 2>/dev/null || echo "Note: UI not built, server will show build message"
-echo "UI built to: $UI_DIST"
-
-# Create global config/state/cache dirs
-if [ -n "$HEIDI_HOME" ]; then
-    mkdir -p "$HEIDI_HOME"
-else
-    if [ "$(uname -s)" = "Darwin" ]; then
-        mkdir -p "$HOME/Library/Application Support/Heidi" "$HOME/Library/Caches/Heidi"
-    else
-        mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}/heidi" "${XDG_STATE_HOME:-$HOME/.local/state}/heidi" "${XDG_CACHE_HOME:-$HOME/.cache}/heidi"
-    fi
+    echo "Installing pipx..."
+    $PYTHON_CMD -m pip install --user pipx
+    pipx ensurepath
+    export PATH="$HOME/.local/bin:$PATH"
 fi
 
 echo ""
+echo "Installing Heidi CLI globally via pipx..."
+pipx install git+https://github.com/heidi-dang/heidi-cli.git
+
+echo ""
+echo "Building UI into cache..."
+heidi ui build
+
+echo ""
+echo "================================"
 echo "Heidi CLI installed successfully!"
 echo ""
-echo "To activate the virtual environment, run:"
-echo "  source .venv/bin/activate"
-echo ""
-echo "Then run:"
-echo "  heidi init"
+echo "Usage from any directory:"
 echo "  heidi --help"
-echo ""
-echo "To start the UI:"
 echo "  heidi serve --ui"
-echo "  # Or: heidi start ui"
+echo ""
