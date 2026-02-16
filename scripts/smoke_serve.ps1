@@ -1,7 +1,7 @@
 # smoke_serve.ps1 - Windows acceptance tests for heidi serve command
 # Run with: powershell -ExecutionPolicy Bypass -File scripts/smoke_serve.ps1
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 $HEIDI_CMD = "python -m src.heidi_cli.cli"
 $PORT = 17777
@@ -13,37 +13,36 @@ function Fail {
     exit 1
 }
 
+function Test-Command {
+    param($cmd)
+    $result = & cmd /c "$cmd 2>&1"
+    return $LASTEXITCODE -eq 0
+}
+
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "Heidi CLI Smoke: serve command (Windows)" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 
 Write-Host "=== Test 1: heidi --version ===" -ForegroundColor Yellow
-try {
-    Invoke-Expression "$HEIDI_CMD --version" 2>$null
-} catch {
-    Fail "--version failed"
-}
+$output = & cmd /c "$HEIDI_CMD --version 2>&1"
+Write-Host $output
+if ($LASTEXITCODE -ne 0) { Fail "--version failed" }
 
 Write-Host ""
 Write-Host "=== Test 2: heidi doctor ===" -ForegroundColor Yellow
-try {
-    Invoke-Expression "$HEIDI_CMD doctor" 2>$null
-} catch {
-    Fail "doctor failed"
-}
+$output = & cmd /c "$HEIDI_CMD doctor 2>&1"
+Write-Host $output
+if ($LASTEXITCODE -ne 0) { Fail "doctor failed" }
 
 Write-Host ""
 Write-Host "=== Test 3: heidi serve --plain (foreground) ===" -ForegroundColor Yellow
 Write-Host "Starting server on port ${PORT}..."
 
-$serverJob = Start-Job -ScriptBlock {
-    param($cmd, $port)
-    Set-Location $env:HEIDI_CLI_DIR
-    Invoke-Expression "$cmd serve --port $port --plain" 2>$null
-} -ArgumentList $HEIDI_CMD, $PORT
+# Start server in background using Start-Process
+$serverProc = Start-Process -FilePath "python" -ArgumentList "-m","src.heidi_cli.cli","serve","--port",$PORT,"--plain" -NoNewWindow -PassThru -RedirectStandardOutput "$env:TEMP\heidi_out.txt" -RedirectStandardError "$env:TEMP\heidi_err.txt"
 
-Start-Sleep 3
+Start-Sleep 4
 
 Write-Host "Checking health endpoint..."
 try {
@@ -53,23 +52,25 @@ try {
         Fail "Health check failed: $healthResponse"
     }
 } catch {
+    if ($serverProc -and !$serverProc.HasExited) {
+        Stop-Process $serverProc.Id -Force -ErrorAction SilentlyContinue
+    }
     Fail "Health check failed: $_"
 }
 
 Write-Host "Stopping server..."
-Stop-Job $serverJob -ErrorAction SilentlyContinue
-Remove-Job $serverJob -Force -ErrorAction SilentlyContinue
+if ($serverProc -and !$serverProc.HasExited) {
+    Stop-Process $serverProc.Id -Force -ErrorAction SilentlyContinue
+}
 Start-Sleep 1
 
 Write-Host ""
 Write-Host "=== Test 4: heidi serve --detach ===" -ForegroundColor Yellow
 Write-Host "Starting detached server..."
 
-try {
-    Invoke-Expression "$HEIDI_CMD serve --port $PORT --detach --plain" 2>$null
-} catch {
-    # Ignore errors on detach
-}
+$output = & cmd /c "$HEIDI_CMD serve --port $PORT --detach --plain 2>&1"
+Write-Host $output
+
 Start-Sleep 3
 
 Write-Host "Checking if server is running..."
@@ -86,14 +87,9 @@ try {
 Write-Host ""
 Write-Host "=== Test 5: HEIDI_PLAIN=1 environment ===" -ForegroundColor Yellow
 $env:HEIDI_PLAIN = "1"
-$serverJob = Start-Job -ScriptBlock {
-    param($cmd, $port)
-    Set-Location $env:HEIDI_CLI_DIR
-    Invoke-Expression "$cmd serve --port $port" 2>$null
-} -ArgumentList $HEIDI_CMD, ($PORT + 1)
-
-Start-Sleep 3
+$serverProc2 = Start-Process -FilePath "python" -ArgumentList "-m","src.heidi_cli.cli","serve","--port",($PORT+1) -NoNewWindow -PassThru
 $env:HEIDI_PLAIN = ""
+Start-Sleep 3
 
 try {
     $healthResponse = Invoke-RestMethod "http://127.0.0.1:$($PORT+1)/health" -TimeoutSec 5
@@ -102,8 +98,9 @@ try {
     # Ignore, may fail if server still starting
 }
 
-Stop-Job $serverJob -ErrorAction SilentlyContinue
-Remove-Job $serverJob -Force -ErrorAction SilentlyContinue
+if ($serverProc2 -and !$serverProc2.HasExited) {
+    Stop-Process $serverProc2.Id -Force -ErrorAction SilentlyContinue
+}
 
 Write-Host ""
 Write-Host "==========================================" -ForegroundColor Green
