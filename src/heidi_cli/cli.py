@@ -1773,6 +1773,8 @@ def serve(
 
         time.sleep(1)
 
+    import platform
+
     if detach:
         state_dir = heidi_state_dir()
         if state_dir:
@@ -1781,21 +1783,45 @@ def serve(
         else:
             pid_file = Path.cwd() / ".heidi_server.pid"
 
-        pid = os.fork()
-        if pid > 0:
+        if platform.system() == "Windows":
+            import subprocess
+
+            cmd = [sys.executable, "-m", "src.heidi_cli.cli", "serve", "--port", str(port)]
+            if host != "127.0.0.1":
+                cmd.extend(["--host", host])
+            if plain:
+                cmd.append("--plain")
+
+            proc = subprocess.Popen(
+                cmd,
+                cwd=Path.cwd(),
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            )
             with open(pid_file, "w") as f:
-                f.write(str(pid))
+                f.write(str(proc.pid))
             if use_rich:
-                console.print(f"[green]Server started in background (PID: {pid})[/green]")
+                console.print(f"[green]Server started in background (PID: {proc.pid})[/green]")
                 console.print(f"[dim]PID file: {pid_file}[/dim]")
             else:
-                print(f"Server started in background (PID: {pid})")
+                print(f"Server started in background (PID: {proc.pid})")
                 print(f"PID file: {pid_file}")
             sys.exit(0)
+        else:
+            pid = os.fork()
+            if pid > 0:
+                with open(pid_file, "w") as f:
+                    f.write(str(pid))
+                if use_rich:
+                    console.print(f"[green]Server started in background (PID: {pid})[/green]")
+                    console.print(f"[dim]PID file: {pid_file}[/dim]")
+                else:
+                    print(f"Server started in background (PID: {pid})")
+                    print(f"PID file: {pid_file}")
+                sys.exit(0)
 
-        os.setsid()
-        sys.stdout.flush()
-        sys.stderr.flush()
+            os.setsid()
+            sys.stdout.flush()
+            sys.stderr.flush()
 
     if use_rich:
         console.print(f"[cyan]Starting Heidi backend on {host}:{port}...[/cyan]")
