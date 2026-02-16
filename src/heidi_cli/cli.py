@@ -1721,12 +1721,51 @@ def serve(
     port: int = typer.Option(7777, help="Port to bind to"),
     ui: bool = typer.Option(False, "--ui", help="Also start UI"),
     force: bool = typer.Option(False, "--force", "-f", help="Kill existing server if running"),
+    detach: bool = typer.Option(
+        False, "--detach", "-d", help="Run server in background and return immediately"
+    ),
+    plain: bool = typer.Option(
+        False, "--plain", help="Disable rich rendering (default for non-TTY)"
+    ),
 ) -> None:
     """Start Heidi CLI server."""
+    import atexit
+    import os
     import subprocess
+    import sys
     import threading
 
-    # Kill existing server if --force
+    from .config import heidi_state_dir
+    from .render_policy import policy_from_env
+
+    policy = policy_from_env()
+    use_rich = not plain and not policy.plain and policy.is_tty and not policy.is_ci
+
+    if not use_rich:
+        console = Console(force_terminal=False, no_color=True)
+    else:
+        console = Console()
+
+    def _restore_terminal():
+        if use_rich:
+            try:
+                console.show_cursor(True)
+            except Exception:
+                pass
+            try:
+                sys.stdout.write("\033[?1049l")
+                sys.stdout.write("\033[0m")
+                sys.stdout.flush()
+            except Exception:
+                pass
+
+    atexit.register(_restore_terminal)
+
+    def start_backend():
+        from .server import start_server
+
+        start_server(host=host, port=port)
+
     if force:
         subprocess.run(["pkill", "-f", "heidi serve"], capture_output=True)
         subprocess.run(["pkill", "-f", "uvicorn"], capture_output=True)
@@ -1734,12 +1773,35 @@ def serve(
 
         time.sleep(1)
 
-    def start_backend():
-        from .server import start_server
+    if detach:
+        state_dir = heidi_state_dir()
+        if state_dir:
+            state_dir.mkdir(parents=True, exist_ok=True)
+            pid_file = state_dir / "server.pid"
+        else:
+            pid_file = Path.cwd() / ".heidi_server.pid"
 
-        start_server(host=host, port=port)
+        pid = os.fork()
+        if pid > 0:
+            with open(pid_file, "w") as f:
+                f.write(str(pid))
+            if use_rich:
+                console.print(f"[green]Server started in background (PID: {pid})[/green]")
+                console.print(f"[dim]PID file: {pid_file}[/dim]")
+            else:
+                print(f"Server started in background (PID: {pid})")
+                print(f"PID file: {pid_file}")
+            sys.exit(0)
 
-    console.print(f"[cyan]Starting Heidi backend on {host}:{port}...[/cyan]")
+        os.setsid()
+        sys.stdout.flush()
+        sys.stderr.flush()
+
+    if use_rich:
+        console.print(f"[cyan]Starting Heidi backend on {host}:{port}...[/cyan]")
+    else:
+        print(f"Starting Heidi backend on {host}:{port}...")
+
     backend_thread = threading.Thread(target=start_backend, daemon=True)
     backend_thread.start()
 
@@ -1758,17 +1820,32 @@ def serve(
         use_packaged = packaged_ui.exists()
 
         if use_cached:
-            console.print(f"[green]Using cached UI: {ui_cache}[/green]")
-            console.print(f"[green]UI served at: http://localhost:{port}/ui/[/green]")
+            if use_rich:
+                console.print(f"[green]Using cached UI: {ui_cache}[/green]")
+                console.print(f"[green]UI served at: http://localhost:{port}/ui/[/green]")
+            else:
+                print(f"Using cached UI: {ui_cache}")
+                print(f"UI served at: http://localhost:{port}/ui/")
         elif use_packaged:
-            console.print(f"[green]Using packaged UI: {packaged_ui}[/green]")
-            console.print(f"[green]UI served at: http://localhost:{port}/ui/[/green]")
+            if use_rich:
+                console.print(f"[green]Using packaged UI: {packaged_ui}[/green]")
+                console.print(f"[green]UI served at: http://localhost:{port}/ui/[/green]")
+            else:
+                print(f"Using packaged UI: {packaged_ui}")
+                print(f"UI served at: http://localhost:{port}/ui/")
         elif not ui_path.exists():
-            console.print("[yellow]UI not found. Run: heidi ui build[/yellow]")
-            console.print("[cyan]Starting backend only...[/cyan]")
+            if use_rich:
+                console.print("[yellow]UI not found. Run: heidi ui build[/yellow]")
+                console.print("[cyan]Starting backend only...[/cyan]")
+            else:
+                print("UI not found. Run: heidi ui build")
+                print("Starting backend only...")
             ui = False
         else:
-            console.print("[cyan]Starting UI dev server on http://localhost:3002...[/cyan]")
+            if use_rich:
+                console.print("[cyan]Starting UI dev server on http://localhost:3002...[/cyan]")
+            else:
+                print("Starting UI dev server on http://localhost:3002...")
 
             def start_ui():
                 env = os.environ.copy()
@@ -1791,28 +1868,45 @@ def serve(
         else:
             ui_url = "http://localhost:3002"
 
-        console.print(
-            Panel.fit(
-                "[green]Heidi is running!\n\n"
-                f"Backend: http://localhost:{port}\n"
-                f"UI: {ui_url}\n\n"
-                "Press Ctrl+C to stop",
-                title="Heidi CLI",
+        if use_rich:
+            console.print(
+                Panel.fit(
+                    "[green]Heidi is running!\n\n"
+                    f"Backend: http://localhost:{port}\n"
+                    f"UI: {ui_url}\n\n"
+                    "Press Ctrl+C to stop",
+                    title="Heidi CLI",
+                )
             )
-        )
+        else:
+            print(f"Heidi is running!")
+            print(f"Backend: http://localhost:{port}")
+            print(f"UI: {ui_url}")
+            print("")
+            print("Press Ctrl+C to stop")
     else:
-        console.print(
-            Panel.fit(
-                f"[green]Heidi server running at http://{host}:{port}[/green]\n\n"
-                "Press Ctrl+C to stop",
-                title="Heidi CLI Server",
+        if use_rich:
+            console.print(
+                Panel.fit(
+                    f"[green]Heidi server running at http://{host}:{port}[/green]\n\n"
+                    "Press Ctrl+C to stop",
+                    title="Heidi CLI Server",
+                )
             )
-        )
+        else:
+            print(f"Heidi server running at http://{host}:{port}")
+            print("")
+            print("Press Ctrl+C to stop")
 
     try:
         backend_thread.join()
     except KeyboardInterrupt:
-        console.print("[yellow]Stopping Heidi...[/yellow]")
+        if use_rich:
+            console.print("[yellow]Stopping Heidi...[/yellow]")
+        else:
+            print("Stopping Heidi...")
+    finally:
+        _restore_terminal()
 
 
 @app.command("ui")

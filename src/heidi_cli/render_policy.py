@@ -28,6 +28,17 @@ def _env_truthy(key: str) -> bool:
     return os.environ.get(key, "").strip().lower() in _TRUE
 
 
+def _is_wsl() -> bool:
+    if os.path.exists("/proc/version"):
+        try:
+            with open("/proc/version", "r") as f:
+                content = f.read().lower()
+                return "microsoft" in content or "wsl" in content
+        except Exception:
+            pass
+    return False
+
+
 def policy_from_env() -> RenderPolicy:
     is_ci = _env_truthy("CI")
     plain = _env_truthy("HEIDI_PLAIN")
@@ -37,6 +48,14 @@ def policy_from_env() -> RenderPolicy:
     try:
         is_tty = bool(sys.stdout.isatty())
     except Exception:
+        is_tty = False
+
+    term = os.environ.get("TERM", "")
+    if term.lower() == "dumb":
+        is_tty = False
+
+    is_wsl = _is_wsl()
+    if is_wsl:
         is_tty = False
 
     return RenderPolicy(plain=plain, no_color=no_color, debug=debug, is_tty=is_tty, is_ci=is_ci)
