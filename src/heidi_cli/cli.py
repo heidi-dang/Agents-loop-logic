@@ -1879,7 +1879,7 @@ def serve(
                 )
             )
         else:
-            print(f"Heidi is running!")
+            print("Heidi is running!")
             print(f"Backend: http://localhost:{port}")
             print(f"UI: {ui_url}")
             print("")
