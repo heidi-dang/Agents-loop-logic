@@ -89,7 +89,9 @@ class YoutubeLoader:
             )
 
         if self.proxy_url:
-            youtube_proxies = GenericProxyConfig(http_url=self.proxy_url, https_url=self.proxy_url)
+            youtube_proxies = GenericProxyConfig(
+                http_url=self.proxy_url, https_url=self.proxy_url
+            )
             log.debug(f"Using proxy URL: {self.proxy_url[:14]}...")
         else:
             youtube_proxies = None
@@ -97,7 +99,7 @@ class YoutubeLoader:
         transcript_api = YouTubeTranscriptApi(proxy_config=youtube_proxies)
         try:
             transcript_list = transcript_api.list(self.video_id)
-        except Exception:
+        except Exception as e:
             log.exception("Loading YouTube transcript failed")
             return []
 
@@ -108,7 +110,9 @@ class YoutubeLoader:
                 if transcript.is_generated:
                     log.debug(f"Found generated transcript for language '{lang}'")
                     try:
-                        transcript = transcript_list.find_manually_created_transcript([lang])
+                        transcript = transcript_list.find_manually_created_transcript(
+                            [lang]
+                        )
                         log.debug(f"Found manual transcript for language '{lang}'")
                     except NoTranscriptFound:
                         log.debug(

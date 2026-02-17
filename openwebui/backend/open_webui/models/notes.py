@@ -1,11 +1,13 @@
+import json
 import time
 import uuid
 from typing import Optional
+from functools import lru_cache
 
 from sqlalchemy.orm import Session
-from open_webui.internal.db import Base, get_db_context
+from open_webui.internal.db import Base, get_db, get_db_context
 from open_webui.models.groups import Groups
-from open_webui.models.users import User, UserModel, UserResponse
+from open_webui.models.users import User, UserModel, Users, UserResponse
 from open_webui.models.access_grants import AccessGrantModel, AccessGrants
 
 
@@ -125,7 +127,9 @@ class NoteTable:
 
             db.add(new_note)
             db.commit()
-            AccessGrants.set_access_grants("note", note.id, form_data.access_grants, db=db)
+            AccessGrants.set_access_grants(
+                "note", note.id, form_data.access_grants, db=db
+            )
             return self._to_note_model(new_note, db=db)
 
     def get_notes(
@@ -157,11 +161,13 @@ class NoteTable:
                     normalized_query = query_key.replace("-", "").replace(" ", "")
                     query = query.filter(
                         or_(
-                            func.replace(func.replace(Note.title, "-", ""), " ", "").ilike(
-                                f"%{normalized_query}%"
-                            ),
                             func.replace(
-                                func.replace(cast(Note.data["content"]["md"], Text), "-", ""),
+                                func.replace(Note.title, "-", ""), " ", ""
+                            ).ilike(f"%{normalized_query}%"),
+                            func.replace(
+                                func.replace(
+                                    cast(Note.data["content"]["md"], Text), "-", ""
+                                ),
                                 " ",
                                 "",
                             ).ilike(f"%{normalized_query}%"),
@@ -245,7 +251,9 @@ class NoteTable:
         db: Optional[Session] = None,
     ) -> list[NoteModel]:
         with get_db_context(db) as db:
-            user_group_ids = [group.id for group in Groups.get_groups_by_member_id(user_id, db=db)]
+            user_group_ids = [
+                group.id for group in Groups.get_groups_by_member_id(user_id, db=db)
+            ]
 
             query = db.query(Note).order_by(Note.updated_at.desc())
             query = self._has_permission(
@@ -260,7 +268,9 @@ class NoteTable:
             notes = query.all()
             return [self._to_note_model(note, db=db) for note in notes]
 
-    def get_note_by_id(self, id: str, db: Optional[Session] = None) -> Optional[NoteModel]:
+    def get_note_by_id(
+        self, id: str, db: Optional[Session] = None
+    ) -> Optional[NoteModel]:
         with get_db_context(db) as db:
             note = db.query(Note).filter(Note.id == id).first()
             return self._to_note_model(note, db=db) if note else None
@@ -283,7 +293,9 @@ class NoteTable:
                 note.meta = {**note.meta, **form_data["meta"]}
 
             if "access_grants" in form_data:
-                AccessGrants.set_access_grants("note", id, form_data["access_grants"], db=db)
+                AccessGrants.set_access_grants(
+                    "note", id, form_data["access_grants"], db=db
+                )
 
             note.updated_at = int(time.time_ns())
 

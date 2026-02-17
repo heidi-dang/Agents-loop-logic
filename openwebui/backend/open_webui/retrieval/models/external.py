@@ -1,6 +1,7 @@
 import logging
 import requests
 from typing import Optional, List, Tuple
+from urllib.parse import quote
 
 
 from open_webui.env import ENABLE_FORWARD_USER_INFO_HEADERS, REQUESTS_VERIFY
@@ -23,7 +24,9 @@ class ExternalReranker(BaseReranker):
         self.model = model
         self.timeout = timeout
 
-    def predict(self, sentences: List[Tuple[str, str]], user=None) -> Optional[List[float]]:
+    def predict(
+        self, sentences: List[Tuple[str, str]], user=None
+    ) -> Optional[List[float]]:
         query = sentences[0][0]
         docs = [i[1] for i in sentences]
 

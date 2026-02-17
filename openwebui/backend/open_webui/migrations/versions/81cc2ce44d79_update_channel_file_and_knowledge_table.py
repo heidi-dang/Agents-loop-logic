@@ -10,6 +10,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+import open_webui.internal.db
 
 # revision identifiers, used by Alembic.
 revision: str = "81cc2ce44d79"
@@ -25,7 +26,9 @@ def upgrade() -> None:
             sa.Column(
                 "message_id",
                 sa.Text(),
-                sa.ForeignKey("message.id", ondelete="CASCADE", name="fk_channel_file_message_id"),
+                sa.ForeignKey(
+                    "message.id", ondelete="CASCADE", name="fk_channel_file_message_id"
+                ),
                 nullable=True,
             )
         )

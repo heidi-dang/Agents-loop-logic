@@ -1,5 +1,5 @@
 from pymilvus import MilvusClient as Client
-from pymilvus import DataType
+from pymilvus import FieldSchema, DataType
 from pymilvus import connections, Collection
 
 import json
@@ -109,7 +109,9 @@ class MilvusClient(VectorDBBase):
             description="vector",
         )
         schema.add_field(field_name="data", datatype=DataType.JSON, description="data")
-        schema.add_field(field_name="metadata", datatype=DataType.JSON, description="metadata")
+        schema.add_field(
+            field_name="metadata", datatype=DataType.JSON, description="metadata"
+        )
 
         index_params = self.client.prepare_index_params()
 
@@ -357,7 +359,10 @@ class MilvusClient(VectorDBBase):
             )
         elif filter:
             filter_string = " && ".join(
-                [f'metadata["{key}"] == {json.dumps(value)}' for key, value in filter.items()]
+                [
+                    f'metadata["{key}"] == {json.dumps(value)}'
+                    for key, value in filter.items()
+                ]
             )
             log.info(
                 f"Deleting items by filter from {self.collection_prefix}_{collection_name}. Filter: {filter_string}"

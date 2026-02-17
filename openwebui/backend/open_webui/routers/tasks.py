@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Request
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from pydantic import BaseModel
 from typing import Optional
 import logging
+import re
 
 from open_webui.utils.chat import generate_chat_completion
 from open_webui.utils.task import (
@@ -32,6 +33,7 @@ from open_webui.config import (
     DEFAULT_AUTOCOMPLETE_GENERATION_PROMPT_TEMPLATE,
     DEFAULT_EMOJI_GENERATION_PROMPT_TEMPLATE,
     DEFAULT_MOA_GENERATION_PROMPT_TEMPLATE,
+    DEFAULT_VOICE_MODE_PROMPT_TEMPLATE,
 )
 
 log = logging.getLogger(__name__)
@@ -113,7 +115,9 @@ async def update_task_config(
         form_data.TITLE_GENERATION_PROMPT_TEMPLATE
     )
 
-    request.app.state.config.ENABLE_FOLLOW_UP_GENERATION = form_data.ENABLE_FOLLOW_UP_GENERATION
+    request.app.state.config.ENABLE_FOLLOW_UP_GENERATION = (
+        form_data.ENABLE_FOLLOW_UP_GENERATION
+    )
     request.app.state.config.FOLLOW_UP_GENERATION_PROMPT_TEMPLATE = (
         form_data.FOLLOW_UP_GENERATION_PROMPT_TEMPLATE
     )
@@ -147,7 +151,9 @@ async def update_task_config(
         form_data.TOOLS_FUNCTION_CALLING_PROMPT_TEMPLATE
     )
 
-    request.app.state.config.VOICE_MODE_PROMPT_TEMPLATE = form_data.VOICE_MODE_PROMPT_TEMPLATE
+    request.app.state.config.VOICE_MODE_PROMPT_TEMPLATE = (
+        form_data.VOICE_MODE_PROMPT_TEMPLATE
+    )
 
     return {
         "TASK_MODEL": request.app.state.config.TASK_MODEL,
@@ -170,7 +176,9 @@ async def update_task_config(
 
 
 @router.post("/title/completions")
-async def generate_title(request: Request, form_data: dict, user=Depends(get_verified_user)):
+async def generate_title(
+    request: Request, form_data: dict, user=Depends(get_verified_user)
+):
 
     if not request.app.state.config.ENABLE_TITLE_GENERATION:
         return JSONResponse(
@@ -201,7 +209,9 @@ async def generate_title(request: Request, form_data: dict, user=Depends(get_ver
         models,
     )
 
-    log.debug(f"generating chat title using model {task_model_id} for user {user.email} ")
+    log.debug(
+        f"generating chat title using model {task_model_id} for user {user.email} "
+    )
 
     if request.app.state.config.TITLE_GENERATION_PROMPT_TEMPLATE != "":
         template = request.app.state.config.TITLE_GENERATION_PROMPT_TEMPLATE
@@ -210,7 +220,9 @@ async def generate_title(request: Request, form_data: dict, user=Depends(get_ver
 
     content = title_generation_template(template, form_data["messages"], user)
 
-    max_tokens = models[task_model_id].get("info", {}).get("params", {}).get("max_tokens", 1000)
+    max_tokens = (
+        models[task_model_id].get("info", {}).get("params", {}).get("max_tokens", 1000)
+    )
 
     payload = {
         "model": task_model_id,
@@ -239,7 +251,7 @@ async def generate_title(request: Request, form_data: dict, user=Depends(get_ver
 
     try:
         return await generate_chat_completion(request, form_data=payload, user=user)
-    except Exception:
+    except Exception as e:
         log.error("Exception occurred", exc_info=True)
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -248,7 +260,9 @@ async def generate_title(request: Request, form_data: dict, user=Depends(get_ver
 
 
 @router.post("/follow_up/completions")
-async def generate_follow_ups(request: Request, form_data: dict, user=Depends(get_verified_user)):
+async def generate_follow_ups(
+    request: Request, form_data: dict, user=Depends(get_verified_user)
+):
 
     if not request.app.state.config.ENABLE_FOLLOW_UP_GENERATION:
         return JSONResponse(
@@ -279,7 +293,9 @@ async def generate_follow_ups(request: Request, form_data: dict, user=Depends(ge
         models,
     )
 
-    log.debug(f"generating chat title using model {task_model_id} for user {user.email} ")
+    log.debug(
+        f"generating chat title using model {task_model_id} for user {user.email} "
+    )
 
     if request.app.state.config.FOLLOW_UP_GENERATION_PROMPT_TEMPLATE != "":
         template = request.app.state.config.FOLLOW_UP_GENERATION_PROMPT_TEMPLATE
@@ -308,7 +324,7 @@ async def generate_follow_ups(request: Request, form_data: dict, user=Depends(ge
 
     try:
         return await generate_chat_completion(request, form_data=payload, user=user)
-    except Exception:
+    except Exception as e:
         log.error("Exception occurred", exc_info=True)
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -317,7 +333,9 @@ async def generate_follow_ups(request: Request, form_data: dict, user=Depends(ge
 
 
 @router.post("/tags/completions")
-async def generate_chat_tags(request: Request, form_data: dict, user=Depends(get_verified_user)):
+async def generate_chat_tags(
+    request: Request, form_data: dict, user=Depends(get_verified_user)
+):
 
     if not request.app.state.config.ENABLE_TAGS_GENERATION:
         return JSONResponse(
@@ -348,7 +366,9 @@ async def generate_chat_tags(request: Request, form_data: dict, user=Depends(get
         models,
     )
 
-    log.debug(f"generating chat tags using model {task_model_id} for user {user.email} ")
+    log.debug(
+        f"generating chat tags using model {task_model_id} for user {user.email} "
+    )
 
     if request.app.state.config.TAGS_GENERATION_PROMPT_TEMPLATE != "":
         template = request.app.state.config.TAGS_GENERATION_PROMPT_TEMPLATE
@@ -386,7 +406,9 @@ async def generate_chat_tags(request: Request, form_data: dict, user=Depends(get
 
 
 @router.post("/image_prompt/completions")
-async def generate_image_prompt(request: Request, form_data: dict, user=Depends(get_verified_user)):
+async def generate_image_prompt(
+    request: Request, form_data: dict, user=Depends(get_verified_user)
+):
     if getattr(request.state, "direct", False) and hasattr(request.state, "model"):
         models = {
             request.state.model["id"]: request.state.model,
@@ -410,7 +432,9 @@ async def generate_image_prompt(request: Request, form_data: dict, user=Depends(
         models,
     )
 
-    log.debug(f"generating image prompt using model {task_model_id} for user {user.email} ")
+    log.debug(
+        f"generating image prompt using model {task_model_id} for user {user.email} "
+    )
 
     if request.app.state.config.IMAGE_PROMPT_GENERATION_PROMPT_TEMPLATE != "":
         template = request.app.state.config.IMAGE_PROMPT_GENERATION_PROMPT_TEMPLATE
@@ -439,7 +463,7 @@ async def generate_image_prompt(request: Request, form_data: dict, user=Depends(
 
     try:
         return await generate_chat_completion(request, form_data=payload, user=user)
-    except Exception:
+    except Exception as e:
         log.error("Exception occurred", exc_info=True)
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -448,20 +472,22 @@ async def generate_image_prompt(request: Request, form_data: dict, user=Depends(
 
 
 @router.post("/queries/completions")
-async def generate_queries(request: Request, form_data: dict, user=Depends(get_verified_user)):
+async def generate_queries(
+    request: Request, form_data: dict, user=Depends(get_verified_user)
+):
 
     type = form_data.get("type")
     if type == "web_search":
         if not request.app.state.config.ENABLE_SEARCH_QUERY_GENERATION:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Search query generation is disabled",
+                detail=f"Search query generation is disabled",
             )
     elif type == "retrieval":
         if not request.app.state.config.ENABLE_RETRIEVAL_QUERY_GENERATION:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Query generation is disabled",
+                detail=f"Query generation is disabled",
             )
 
     if getattr(request.state, "cached_queries", None):
@@ -491,7 +517,9 @@ async def generate_queries(request: Request, form_data: dict, user=Depends(get_v
         models,
     )
 
-    log.debug(f"generating {type} queries using model {task_model_id} for user {user.email}")
+    log.debug(
+        f"generating {type} queries using model {task_model_id} for user {user.email}"
+    )
 
     if (request.app.state.config.QUERY_GENERATION_PROMPT_TEMPLATE).strip() != "":
         template = request.app.state.config.QUERY_GENERATION_PROMPT_TEMPLATE
@@ -534,7 +562,7 @@ async def generate_autocompletion(
     if not request.app.state.config.ENABLE_AUTOCOMPLETE_GENERATION:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Autocompletion generation is disabled",
+            detail=f"Autocompletion generation is disabled",
         )
 
     type = form_data.get("type")
@@ -542,7 +570,10 @@ async def generate_autocompletion(
     messages = form_data.get("messages")
 
     if request.app.state.config.AUTOCOMPLETE_GENERATION_INPUT_MAX_LENGTH > 0:
-        if len(prompt) > request.app.state.config.AUTOCOMPLETE_GENERATION_INPUT_MAX_LENGTH:
+        if (
+            len(prompt)
+            > request.app.state.config.AUTOCOMPLETE_GENERATION_INPUT_MAX_LENGTH
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Input prompt exceeds maximum length of {request.app.state.config.AUTOCOMPLETE_GENERATION_INPUT_MAX_LENGTH}",
@@ -571,7 +602,9 @@ async def generate_autocompletion(
         models,
     )
 
-    log.debug(f"generating autocompletion using model {task_model_id} for user {user.email}")
+    log.debug(
+        f"generating autocompletion using model {task_model_id} for user {user.email}"
+    )
 
     if (request.app.state.config.AUTOCOMPLETE_GENERATION_PROMPT_TEMPLATE).strip() != "":
         template = request.app.state.config.AUTOCOMPLETE_GENERATION_PROMPT_TEMPLATE
@@ -609,7 +642,9 @@ async def generate_autocompletion(
 
 
 @router.post("/emoji/completions")
-async def generate_emoji(request: Request, form_data: dict, user=Depends(get_verified_user)):
+async def generate_emoji(
+    request: Request, form_data: dict, user=Depends(get_verified_user)
+):
 
     if getattr(request.state, "direct", False) and hasattr(request.state, "model"):
         models = {
@@ -675,7 +710,9 @@ async def generate_emoji(request: Request, form_data: dict, user=Depends(get_ver
 
 
 @router.post("/moa/completions")
-async def generate_moa_response(request: Request, form_data: dict, user=Depends(get_verified_user)):
+async def generate_moa_response(
+    request: Request, form_data: dict, user=Depends(get_verified_user)
+):
 
     if getattr(request.state, "direct", False) and hasattr(request.state, "model"):
         models = {

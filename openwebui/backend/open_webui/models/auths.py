@@ -3,7 +3,7 @@ import uuid
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from open_webui.internal.db import Base, get_db_context
+from open_webui.internal.db import Base, JSONField, get_db, get_db_context
 from open_webui.models.users import User, UserModel, UserProfileImageResponse, Users
 from open_webui.utils.validate import validate_profile_image_url
 from pydantic import BaseModel, field_validator
@@ -103,7 +103,9 @@ class AuthsTable:
 
             id = str(uuid.uuid4())
 
-            auth = AuthModel(**{"id": id, "email": email, "password": password, "active": True})
+            auth = AuthModel(
+                **{"id": id, "email": email, "password": password, "active": True}
+            )
             result = Auth(**auth.model_dump())
             db.add(result)
 
@@ -165,7 +167,7 @@ class AuthsTable:
                 result = (
                     db.query(Auth, User)
                     .join(User, Auth.id == User.id)
-                    .filter(Auth.email == email, Auth.active)
+                    .filter(Auth.email == email, Auth.active == True)
                     .first()
                 )
                 if result:
@@ -180,13 +182,17 @@ class AuthsTable:
     ) -> bool:
         try:
             with get_db_context(db) as db:
-                result = db.query(Auth).filter_by(id=id).update({"password": new_password})
+                result = (
+                    db.query(Auth).filter_by(id=id).update({"password": new_password})
+                )
                 db.commit()
                 return True if result == 1 else False
         except Exception:
             return False
 
-    def update_email_by_id(self, id: str, email: str, db: Optional[Session] = None) -> bool:
+    def update_email_by_id(
+        self, id: str, email: str, db: Optional[Session] = None
+    ) -> bool:
         try:
             with get_db_context(db) as db:
                 result = db.query(Auth).filter_by(id=id).update({"email": email})

@@ -82,6 +82,8 @@ def search_searxng(
     if filter_list:
         sorted_results = get_filtered_results(sorted_results, filter_list)
     return [
-        SearchResult(link=result["url"], title=result.get("title"), snippet=result.get("content"))
+        SearchResult(
+            link=result["url"], title=result.get("title"), snippet=result.get("content")
+        )
         for result in sorted_results[:count]
     ]

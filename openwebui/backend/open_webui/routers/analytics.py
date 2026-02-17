@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from open_webui.models.chat_messages import ChatMessages, ChatMessageModel
 from open_webui.models.chats import Chats
+from open_webui.models.groups import Groups
 from open_webui.models.users import Users
 from open_webui.models.feedbacks import Feedbacks
 from open_webui.utils.auth import get_admin_user
@@ -89,7 +90,9 @@ async def get_user_analytics(
     )
 
     # Get user info for top users
-    top_user_ids = [uid for uid, _ in sorted(counts.items(), key=lambda x: -x[1])[:limit]]
+    top_user_ids = [
+        uid for uid, _ in sorted(counts.items(), key=lambda x: -x[1])[:limit]
+    ]
     user_info = {u.id: u for u in Users.get_users_by_user_ids(top_user_ids, db=db)}
 
     users = []
@@ -136,7 +139,9 @@ async def get_messages(
             db=db,
         )
     elif user_id:
-        return ChatMessages.get_messages_by_user_id(user_id=user_id, skip=skip, limit=limit, db=db)
+        return ChatMessages.get_messages_by_user_id(
+            user_id=user_id, skip=skip, limit=limit, db=db
+        )
     else:
         # Return empty if no filter specified
         return []
@@ -204,7 +209,10 @@ async def get_daily_stats(
             start_date=start_date, end_date=end_date, group_id=group_id, db=db
         )
     return DailyStatsResponse(
-        data=[DailyStatsEntry(date=date, models=models) for date, models in sorted(counts.items())]
+        data=[
+            DailyStatsEntry(date=date, models=models)
+            for date, models in sorted(counts.items())
+        ]
     )
 
 

@@ -6,10 +6,10 @@ import re
 
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import BigInteger, Column, Text, JSON, Boolean
+from sqlalchemy import BigInteger, Column, Text, JSON, Boolean, func
 from sqlalchemy.orm import Session
 
-from open_webui.internal.db import Base, get_db_context
+from open_webui.internal.db import Base, JSONField, get_db, get_db_context
 
 log = logging.getLogger(__name__)
 
@@ -136,7 +136,9 @@ class FolderTable:
                 folders = []
 
                 def get_children(folder):
-                    children = self.get_folders_by_parent_id_and_user_id(folder.id, user_id, db=db)
+                    children = self.get_folders_by_parent_id_and_user_id(
+                        folder.id, user_id, db=db
+                    )
                     for child in children:
                         get_children(child)
                         folders.append(child)
@@ -190,7 +192,9 @@ class FolderTable:
         with get_db_context(db) as db:
             return [
                 FolderModel.model_validate(folder)
-                for folder in db.query(Folder).filter_by(parent_id=parent_id, user_id=user_id).all()
+                for folder in db.query(Folder)
+                .filter_by(parent_id=parent_id, user_id=user_id)
+                .all()
             ]
 
     def update_folder_parent_id_by_id_and_user_id(
@@ -305,6 +309,7 @@ class FolderTable:
                         folder.id, user_id, db=db
                     )
                     for folder_child in folder_children:
+
                         delete_children(folder_child)
                         folder_ids.append(folder_child.id)
 

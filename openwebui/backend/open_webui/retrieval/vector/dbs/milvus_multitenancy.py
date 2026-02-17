@@ -76,7 +76,9 @@ class MilvusClient(VectorDBBase):
             return self.FILE_COLLECTION, resource_id
         elif collection_name.startswith("web-search-"):
             return self.WEB_SEARCH_COLLECTION, resource_id
-        elif len(collection_name) == 63 and all(c in "0123456789abcdef" for c in collection_name):
+        elif len(collection_name) == 63 and all(
+            c in "0123456789abcdef" for c in collection_name
+        ):
             return self.HASH_BASED_COLLECTION, resource_id
         else:
             return self.KNOWLEDGE_COLLECTION, resource_id
@@ -121,7 +123,9 @@ class MilvusClient(VectorDBBase):
             self._create_shared_collection(mt_collection_name, dimension)
 
     def has_collection(self, collection_name: str) -> bool:
-        mt_collection, resource_id = self._get_collection_and_resource_id(collection_name)
+        mt_collection, resource_id = self._get_collection_and_resource_id(
+            collection_name
+        )
         if not utility.has_collection(mt_collection):
             return False
 
@@ -133,7 +137,9 @@ class MilvusClient(VectorDBBase):
     def upsert(self, collection_name: str, items: List[VectorItem]):
         if not items:
             return
-        mt_collection, resource_id = self._get_collection_and_resource_id(collection_name)
+        mt_collection, resource_id = self._get_collection_and_resource_id(
+            collection_name
+        )
         dimension = len(items[0]["vector"])
         self._ensure_collection(mt_collection, dimension)
         collection = Collection(mt_collection)
@@ -160,7 +166,9 @@ class MilvusClient(VectorDBBase):
         if not vectors:
             return None
 
-        mt_collection, resource_id = self._get_collection_and_resource_id(collection_name)
+        mt_collection, resource_id = self._get_collection_and_resource_id(
+            collection_name
+        )
         if not utility.has_collection(mt_collection):
             return None
 
@@ -190,7 +198,9 @@ class MilvusClient(VectorDBBase):
             metadatas.append(batch_metadatas)
             distances.append(batch_dists)
 
-        return SearchResult(ids=ids, documents=documents, metadatas=metadatas, distances=distances)
+        return SearchResult(
+            ids=ids, documents=documents, metadatas=metadatas, distances=distances
+        )
 
     def delete(
         self,
@@ -198,7 +208,9 @@ class MilvusClient(VectorDBBase):
         ids: Optional[List[str]] = None,
         filter: Optional[Dict[str, Any]] = None,
     ):
-        mt_collection, resource_id = self._get_collection_and_resource_id(collection_name)
+        mt_collection, resource_id = self._get_collection_and_resource_id(
+            collection_name
+        )
         if not utility.has_collection(mt_collection):
             return
 
@@ -223,7 +235,9 @@ class MilvusClient(VectorDBBase):
                 utility.drop_collection(collection_name)
 
     def delete_collection(self, collection_name: str):
-        mt_collection, resource_id = self._get_collection_and_resource_id(collection_name)
+        mt_collection, resource_id = self._get_collection_and_resource_id(
+            collection_name
+        )
         if not utility.has_collection(mt_collection):
             return
 
@@ -233,7 +247,9 @@ class MilvusClient(VectorDBBase):
     def query(
         self, collection_name: str, filter: Dict[str, Any], limit: Optional[int] = None
     ) -> Optional[GetResult]:
-        mt_collection, resource_id = self._get_collection_and_resource_id(collection_name)
+        mt_collection, resource_id = self._get_collection_and_resource_id(
+            collection_name
+        )
         if not utility.has_collection(mt_collection):
             return None
 

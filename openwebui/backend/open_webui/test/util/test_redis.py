@@ -174,7 +174,9 @@ class TestSentinelRedisProxy:
 
     @patch("redis.sentinel.Sentinel")
     @patch("redis.from_url")
-    def test_get_redis_connection_with_sentinel(self, mock_from_url, mock_sentinel_class):
+    def test_get_redis_connection_with_sentinel(
+        self, mock_from_url, mock_sentinel_class
+    ):
         """Test getting Redis connection with Sentinel"""
         mock_sentinel = Mock()
         mock_sentinel_class.return_value = mock_sentinel
@@ -198,7 +200,9 @@ class TestSentinelRedisProxy:
 
         redis_url = "redis://localhost:6379/0"
 
-        result = get_redis_connection(redis_url=redis_url, redis_sentinels=None, async_mode=False)
+        result = get_redis_connection(
+            redis_url=redis_url, redis_sentinels=None, async_mode=False
+        )
 
         assert result == mock_redis
         mock_from_url.assert_called_once_with(redis_url, decode_responses=True)
@@ -211,7 +215,9 @@ class TestSentinelRedisProxy:
 
         redis_url = "redis://localhost:6379/0"
 
-        result = get_redis_connection(redis_url=redis_url, redis_sentinels=None, async_mode=True)
+        result = get_redis_connection(
+            redis_url=redis_url, redis_sentinels=None, async_mode=True
+        )
 
         assert result == mock_redis
         mock_from_url.assert_called_once_with(redis_url, decode_responses=True)
@@ -270,7 +276,9 @@ class TestSentinelRedisProxyCommands:
         # Mock async hash command responses
         mock_master.hset = AsyncMock(return_value=1)
         mock_master.hget = AsyncMock(return_value="test_value")
-        mock_master.hgetall = AsyncMock(return_value={"key1": "value1", "key2": "value2"})
+        mock_master.hgetall = AsyncMock(
+            return_value={"key1": "value1", "key2": "value2"}
+        )
 
         mock_sentinel.master_for.return_value = mock_master
 
@@ -462,7 +470,9 @@ class TestSentinelRedisProxyCommands:
 
         # First call fails with ReadOnlyError, second succeeds
         mock_master.hset.side_effect = [
-            redis.exceptions.ReadOnlyError("READONLY You can't write against a read only replica"),
+            redis.exceptions.ReadOnlyError(
+                "READONLY You can't write against a read only replica"
+            ),
             1,
         ]
 

@@ -31,7 +31,9 @@ def search_kagi(
     search_results = json_response.get("data", [])
 
     results = [
-        SearchResult(link=result["url"], title=result["title"], snippet=result.get("snippet"))
+        SearchResult(
+            link=result["url"], title=result["title"], snippet=result.get("snippet")
+        )
         for result in search_results
         if result["t"] == 0
     ]

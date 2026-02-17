@@ -10,6 +10,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+import open_webui.internal.db
 
 # revision identifiers, used by Alembic.
 revision: str = "90ef40d4714e"
@@ -33,7 +34,9 @@ def upgrade() -> None:
     # Update 'channel_member' table
     op.add_column("channel_member", sa.Column("role", sa.Text(), nullable=True))
     op.add_column("channel_member", sa.Column("invited_by", sa.Text(), nullable=True))
-    op.add_column("channel_member", sa.Column("invited_at", sa.BigInteger(), nullable=True))
+    op.add_column(
+        "channel_member", sa.Column("invited_at", sa.BigInteger(), nullable=True)
+    )
 
     #  Create 'channel_webhook' table
     op.create_table(

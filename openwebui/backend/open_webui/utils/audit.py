@@ -106,11 +106,15 @@ class AuditContext:
 
     def add_request_chunk(self, chunk: bytes):
         if len(self.request_body) < self.max_body_size:
-            self.request_body.extend(chunk[: self.max_body_size - len(self.request_body)])
+            self.request_body.extend(
+                chunk[: self.max_body_size - len(self.request_body)]
+            )
 
     def add_response_chunk(self, chunk: bytes):
         if len(self.response_body) < self.max_body_size:
-            self.response_body.extend(chunk[: self.max_body_size - len(self.response_body)])
+            self.response_body.extend(
+                chunk[: self.max_body_size - len(self.response_body)]
+            )
 
 
 class AuditLoggingMiddleware:
@@ -173,7 +177,9 @@ class AuditLoggingMiddleware:
             await self.app(scope, receive_wrapper, send_wrapper)
 
     @asynccontextmanager
-    async def _audit_context(self, request: Request) -> AsyncGenerator[AuditContext, None]:
+    async def _audit_context(
+        self, request: Request
+    ) -> AsyncGenerator[AuditContext, None]:
         """
         async context manager that ensures that an audit log entry is recorded after the request is processed.
         """
@@ -197,7 +203,10 @@ class AuditLoggingMiddleware:
         return None
 
     def _should_skip_auditing(self, request: Request) -> bool:
-        if request.method not in {"POST", "PUT", "PATCH", "DELETE"} or AUDIT_LOG_LEVEL == "NONE":
+        if (
+            request.method not in {"POST", "PUT", "PATCH", "DELETE"}
+            or AUDIT_LOG_LEVEL == "NONE"
+        ):
             return True
 
         ALWAYS_LOG_ENDPOINTS = {
@@ -212,11 +221,15 @@ class AuditLoggingMiddleware:
 
         # Skip logging if the request is not authenticated
         # Check both Authorization header (API keys) and token cookie (browser sessions)
-        if not request.headers.get("authorization") and not request.cookies.get("token"):
+        if not request.headers.get("authorization") and not request.cookies.get(
+            "token"
+        ):
             return True
 
         # match either /api/<resource>/...(for the endpoint /api/chat case) or /api/v1/<resource>/...
-        pattern = re.compile(r"^/api(?:/v1)?/(" + "|".join(self.excluded_paths) + r")\b")
+        pattern = re.compile(
+            r"^/api(?:/v1)?/(" + "|".join(self.excluded_paths) + r")\b"
+        )
         if pattern.match(request.url.path):
             return True
 
@@ -239,7 +252,9 @@ class AuditLoggingMiddleware:
         try:
             user = await self._get_authenticated_user(request)
 
-            user = user.model_dump(include={"id", "name", "email", "role"}) if user else {}
+            user = (
+                user.model_dump(include={"id", "name", "email", "role"}) if user else {}
+            )
 
             request_body = context.request_body.decode("utf-8", errors="replace")
             response_body = context.response_body.decode("utf-8", errors="replace")

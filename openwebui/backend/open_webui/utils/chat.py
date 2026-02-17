@@ -1,15 +1,17 @@
+import time
 import logging
 import sys
 
-from typing import Any
+from aiocache import cached
+from typing import Any, Optional
 import random
 import json
 
 import uuid
 import asyncio
 
-from fastapi import Request
-from starlette.responses import StreamingResponse
+from fastapi import Request, status
+from starlette.responses import Response, StreamingResponse, JSONResponse
 
 
 from open_webui.models.users import UserModel
@@ -30,12 +32,18 @@ from open_webui.routers.ollama import (
 )
 
 from open_webui.routers.pipelines import (
+    process_pipeline_inlet_filter,
     process_pipeline_outlet_filter,
 )
 
 from open_webui.models.functions import Functions
+from open_webui.models.models import Models
 
 
+from open_webui.utils.plugin import (
+    load_function_module_by_id,
+    get_function_module_from_cache,
+)
 from open_webui.utils.models import get_all_models, check_model_access
 from open_webui.utils.payload import convert_payload_openai_to_ollama
 from open_webui.utils.response import (
@@ -124,7 +132,7 @@ async def generate_direct_chat_completion(
             async def background():
                 try:
                     del sio.handlers["/"][channel]
-                except Exception:
+                except Exception as e:
                     pass
 
             # Return the streaming response
@@ -187,7 +195,9 @@ async def generate_chat_completion(
     model = models[model_id]
 
     if getattr(request.state, "direct", False):
-        return await generate_direct_chat_completion(request, form_data, user=user, models=models)
+        return await generate_direct_chat_completion(
+            request, form_data, user=user, models=models
+        )
     else:
         # Check if user has access to the model
         if not bypass_filter and user.role == "user":
@@ -219,7 +229,7 @@ async def generate_chat_completion(
 
             form_data["model"] = selected_model_id
 
-            if form_data.get("stream"):
+            if form_data.get("stream") == True:
 
                 async def stream_wrapper(stream):
                     yield f"data: {json.dumps({'selected_model_id': selected_model_id})}\n\n"
@@ -330,7 +340,9 @@ async def chat_completed(request: Request, form_data: dict, user: Any):
     }
 
     try:
-        filter_ids = get_sorted_filter_ids(request, model, metadata.get("filter_ids", []))
+        filter_ids = get_sorted_filter_ids(
+            request, model, metadata.get("filter_ids", [])
+        )
         filter_functions = Functions.get_functions_by_ids(filter_ids)
 
         result, _ = await process_filter_functions(

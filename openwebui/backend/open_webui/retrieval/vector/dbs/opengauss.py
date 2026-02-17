@@ -1,13 +1,17 @@
 from typing import Optional, List, Dict, Any
 import logging
 import re
+import json
 from sqlalchemy import (
+    func,
+    literal,
     cast,
     column,
     create_engine,
     Column,
     Integer,
     MetaData,
+    LargeBinary,
     select,
     text,
     Text,
@@ -36,7 +40,9 @@ class OpenGaussDialect(PGDialect_psycopg2):
             if not version:
                 return (9, 0, 0)
 
-            match = re.search(r"openGauss\s+(\d+)\.(\d+)\.(\d+)(?:-\w+)?", version, re.IGNORECASE)
+            match = re.search(
+                r"openGauss\s+(\d+)\.(\d+)\.(\d+)(?:-\w+)?", version, re.IGNORECASE
+            )
             if match:
                 return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
 
@@ -156,7 +162,9 @@ class OpenGaussClient(VectorDBBase):
             else:
                 raise Exception("The 'vector' column type is not Vector.")
         else:
-            raise Exception("The 'vector' column does not exist in the 'document_chunk' table.")
+            raise Exception(
+                "The 'vector' column does not exist in the 'document_chunk' table."
+            )
 
     def adjust_vector_length(self, vector: List[float]) -> List[float]:
         current_length = len(vector)
@@ -181,7 +189,9 @@ class OpenGaussClient(VectorDBBase):
                 new_items.append(new_chunk)
             self.session.bulk_save_objects(new_items)
             self.session.commit()
-            log.info(f"Inserting {len(new_items)} items into collection '{collection_name}'.")
+            log.info(
+                f"Inserting {len(new_items)} items into collection '{collection_name}'."
+            )
         except Exception as e:
             self.session.rollback()
             log.exception(f"Failed to insert data: {e}")
@@ -192,7 +202,9 @@ class OpenGaussClient(VectorDBBase):
             for item in items:
                 vector = self.adjust_vector_length(item["vector"])
                 existing = (
-                    self.session.query(DocumentChunk).filter(DocumentChunk.id == item["id"]).first()
+                    self.session.query(DocumentChunk)
+                    .filter(DocumentChunk.id == item["id"])
+                    .first()
                 )
                 if existing:
                     existing.vector = vector
@@ -209,7 +221,9 @@ class OpenGaussClient(VectorDBBase):
                     )
                     self.session.add(new_chunk)
             self.session.commit()
-            log.info(f"Inserting/updating {len(items)} items in collection '{collection_name}'.")
+            log.info(
+                f"Inserting/updating {len(items)} items in collection '{collection_name}'."
+            )
         except Exception as e:
             self.session.rollback()
             log.exception(f"Failed to insert or update data.: {e}")
@@ -236,7 +250,9 @@ class OpenGaussClient(VectorDBBase):
             q_vector_col = column("q_vector", Vector(VECTOR_LENGTH))
             query_vectors = (
                 values(qid_col, q_vector_col)
-                .data([(idx, vector_expr(vector)) for idx, vector in enumerate(vectors)])
+                .data(
+                    [(idx, vector_expr(vector)) for idx, vector in enumerate(vectors)]
+                )
                 .alias("query_vectors")
             )
 
@@ -244,13 +260,17 @@ class OpenGaussClient(VectorDBBase):
                 DocumentChunk.id,
                 DocumentChunk.text,
                 DocumentChunk.vmetadata,
-                (DocumentChunk.vector.cosine_distance(query_vectors.c.q_vector)).label("distance"),
+                (DocumentChunk.vector.cosine_distance(query_vectors.c.q_vector)).label(
+                    "distance"
+                ),
             ]
 
             subq = (
                 select(*result_fields)
                 .where(DocumentChunk.collection_name == collection_name)
-                .order_by(DocumentChunk.vector.cosine_distance(query_vectors.c.q_vector))
+                .order_by(
+                    DocumentChunk.vector.cosine_distance(query_vectors.c.q_vector)
+                )
             )
             if limit is not None:
                 subq = subq.limit(limit)
@@ -323,7 +343,9 @@ class OpenGaussClient(VectorDBBase):
             log.exception(f"Conditional query failed: {e}")
             return None
 
-    def get(self, collection_name: str, limit: Optional[int] = None) -> Optional[GetResult]:
+    def get(
+        self, collection_name: str, limit: Optional[int] = None
+    ) -> Optional[GetResult]:
         try:
             query = self.session.query(DocumentChunk).filter(
                 DocumentChunk.collection_name == collection_name
@@ -361,7 +383,9 @@ class OpenGaussClient(VectorDBBase):
                 query = query.filter(DocumentChunk.id.in_(ids))
             if filter:
                 for key, value in filter.items():
-                    query = query.filter(DocumentChunk.vmetadata[key].astext == str(value))
+                    query = query.filter(
+                        DocumentChunk.vmetadata[key].astext == str(value)
+                    )
             deleted = query.delete(synchronize_session=False)
             self.session.commit()
             log.info(f"Deleted {deleted} items from collection '{collection_name}'")

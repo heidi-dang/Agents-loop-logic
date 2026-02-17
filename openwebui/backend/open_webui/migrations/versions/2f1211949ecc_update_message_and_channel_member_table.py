@@ -10,6 +10,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+import open_webui.internal.db
 
 # revision identifiers, used by Alembic.
 revision: str = "2f1211949ecc"
@@ -56,12 +57,20 @@ def upgrade() -> None:
     op.add_column("channel_member", sa.Column("data", sa.JSON(), nullable=True))
     op.add_column("channel_member", sa.Column("meta", sa.JSON(), nullable=True))
 
-    op.add_column("channel_member", sa.Column("joined_at", sa.BigInteger(), nullable=False))
-    op.add_column("channel_member", sa.Column("left_at", sa.BigInteger(), nullable=True))
+    op.add_column(
+        "channel_member", sa.Column("joined_at", sa.BigInteger(), nullable=False)
+    )
+    op.add_column(
+        "channel_member", sa.Column("left_at", sa.BigInteger(), nullable=True)
+    )
 
-    op.add_column("channel_member", sa.Column("last_read_at", sa.BigInteger(), nullable=True))
+    op.add_column(
+        "channel_member", sa.Column("last_read_at", sa.BigInteger(), nullable=True)
+    )
 
-    op.add_column("channel_member", sa.Column("updated_at", sa.BigInteger(), nullable=True))
+    op.add_column(
+        "channel_member", sa.Column("updated_at", sa.BigInteger(), nullable=True)
+    )
 
     # New columns to be added to message table
     op.add_column(

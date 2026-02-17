@@ -80,7 +80,13 @@ def convert_ollama_usage_to_openai(data: dict) -> dict:
         # Ollama-specific metrics
         "response_token/s": (
             round(
-                ((data.get("eval_count", 0) / (data.get("eval_duration", 0) / 10_000_000)) * 100),
+                (
+                    (
+                        data.get("eval_count", 0)
+                        / ((data.get("eval_duration", 0) / 10_000_000))
+                    )
+                    * 100
+                ),
                 2,
             )
             if data.get("eval_duration", 0) > 0
@@ -91,7 +97,7 @@ def convert_ollama_usage_to_openai(data: dict) -> dict:
                 (
                     (
                         data.get("prompt_eval_count", 0)
-                        / (data.get("prompt_eval_duration", 0) / 10_000_000)
+                        / ((data.get("prompt_eval_duration", 0) / 10_000_000))
                     )
                     * 100
                 ),
@@ -228,7 +234,11 @@ def convert_embedding_response_ollama_to_openai(response) -> dict:
             "model": response.get("model"),
         }
     # Already OpenAI-compatible?
-    elif isinstance(response, dict) and "data" in response and isinstance(response["data"], list):
+    elif (
+        isinstance(response, dict)
+        and "data" in response
+        and isinstance(response["data"], list)
+    ):
         return response
 
     # Fallback: return as is if unrecognized

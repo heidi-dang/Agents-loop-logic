@@ -7,6 +7,7 @@ NOTE: This is an experimental implementation and may not fully comply with SCIM 
 
 import logging
 import uuid
+import time
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 
@@ -16,7 +17,15 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from open_webui.models.users import Users, UserModel
 from open_webui.models.groups import Groups, GroupModel
+from open_webui.utils.auth import (
+    get_admin_user,
+    get_current_user,
+    decode_token,
+    get_verified_user,
+)
+from open_webui.constants import ERROR_MESSAGES
 
+from open_webui.config import OAUTH_PROVIDERS
 from open_webui.env import SCIM_AUTH_PROVIDER
 
 
@@ -222,7 +231,9 @@ class SCIMPatchRequest(BaseModel):
     Operations: List[SCIMPatchOperation]
 
 
-def get_scim_auth(request: Request, authorization: Optional[str] = Header(None)) -> bool:
+def get_scim_auth(
+    request: Request, authorization: Optional[str] = Header(None)
+) -> bool:
     """
     Verify SCIM authentication
     Checks for SCIM-specific bearer token configured in the system
@@ -251,7 +262,9 @@ def get_scim_auth(request: Request, authorization: Optional[str] = Header(None))
 
         # Check if SCIM is enabled
         enable_scim = getattr(request.app.state, "ENABLE_SCIM", False)
-        log.info(f"SCIM auth check - raw ENABLE_SCIM: {enable_scim}, type: {type(enable_scim)}")
+        log.info(
+            f"SCIM auth check - raw ENABLE_SCIM: {enable_scim}, type: {type(enable_scim)}"
+        )
 
         # Handle both PersistentConfig and direct value
         if hasattr(enable_scim, "value"):
@@ -358,12 +371,20 @@ def user_to_scim(user: UserModel, request: Request, db=None) -> SCIMUser:
         displayName=user.name,
         emails=[SCIMEmail(value=user.email)],
         active=user.role != "pending",
-        photos=([SCIMPhoto(value=user.profile_image_url)] if user.profile_image_url else None),
+        photos=(
+            [SCIMPhoto(value=user.profile_image_url)]
+            if user.profile_image_url
+            else None
+        ),
         groups=groups if groups else None,
         meta=SCIMMeta(
             resourceType=SCIM_RESOURCE_TYPE_USER,
-            created=datetime.fromtimestamp(user.created_at, tz=timezone.utc).isoformat(),
-            lastModified=datetime.fromtimestamp(user.updated_at, tz=timezone.utc).isoformat(),
+            created=datetime.fromtimestamp(
+                user.created_at, tz=timezone.utc
+            ).isoformat(),
+            lastModified=datetime.fromtimestamp(
+                user.updated_at, tz=timezone.utc
+            ).isoformat(),
             location=f"{request.base_url}api/v1/scim/v2/Users/{user.id}",
         ),
     )
@@ -390,8 +411,12 @@ def group_to_scim(group: GroupModel, request: Request, db=None) -> SCIMGroup:
         members=members,
         meta=SCIMMeta(
             resourceType=SCIM_RESOURCE_TYPE_GROUP,
-            created=datetime.fromtimestamp(group.created_at, tz=timezone.utc).isoformat(),
-            lastModified=datetime.fromtimestamp(group.updated_at, tz=timezone.utc).isoformat(),
+            created=datetime.fromtimestamp(
+                group.created_at, tz=timezone.utc
+            ).isoformat(),
+            lastModified=datetime.fromtimestamp(
+                group.updated_at, tz=timezone.utc
+            ).isoformat(),
             location=f"{request.base_url}api/v1/scim/v2/Groups/{group.id}",
         ),
     )
@@ -551,7 +576,9 @@ async def get_user(
     """Get SCIM User by ID"""
     user = Users.get_user_by_id(user_id, db=db)
     if not user:
-        return scim_error(status_code=status.HTTP_404_NOT_FOUND, detail=f"User {user_id} not found")
+        return scim_error(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"User {user_id} not found"
+        )
 
     return user_to_scim(user, request, db=db)
 
@@ -949,7 +976,9 @@ async def patch_group(
                 if isinstance(value, list):
                     for member in value:
                         if isinstance(member, dict) and "value" in member:
-                            Groups.add_users_to_group(group_id, [member["value"]], db=db)
+                            Groups.add_users_to_group(
+                                group_id, [member["value"]], db=db
+                            )
         elif op == "remove":
             if path and path.startswith("members[value eq"):
                 # Remove specific member

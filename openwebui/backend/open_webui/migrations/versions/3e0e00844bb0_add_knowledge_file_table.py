@@ -10,6 +10,8 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
+import open_webui.internal.db
 
 import time
 import json
@@ -63,7 +65,9 @@ def upgrade() -> None:
     )
 
     results = connection.execute(
-        sa.select(knowledge_table.c.id, knowledge_table.c.user_id, knowledge_table.c.data)
+        sa.select(
+            knowledge_table.c.id, knowledge_table.c.user_id, knowledge_table.c.data
+        )
     ).fetchall()
 
     # 3. Insert members into group_member table

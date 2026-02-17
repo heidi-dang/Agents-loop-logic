@@ -12,6 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
+import open_webui.internal.db
 import json
 import time
 
@@ -32,7 +33,9 @@ def _drop_sqlite_indexes_for_column(table_name, column_name, conn):
     for idx in indexes:
         index_name = idx[1]  # index name
         # Get indexed columns
-        idx_info = conn.execute(sa.text(f"PRAGMA index_info('{index_name}')")).fetchall()
+        idx_info = conn.execute(
+            sa.text(f"PRAGMA index_info('{index_name}')")
+        ).fetchall()
 
         indexed_cols = [row[2] for row in idx_info]  # col names
         if column_name in indexed_cols:
@@ -110,13 +113,17 @@ def _convert_column_to_text(table: str, column: str):
 
 
 def upgrade() -> None:
-    op.add_column("user", sa.Column("profile_banner_image_url", sa.Text(), nullable=True))
+    op.add_column(
+        "user", sa.Column("profile_banner_image_url", sa.Text(), nullable=True)
+    )
     op.add_column("user", sa.Column("timezone", sa.String(), nullable=True))
 
     op.add_column("user", sa.Column("presence_state", sa.String(), nullable=True))
     op.add_column("user", sa.Column("status_emoji", sa.String(), nullable=True))
     op.add_column("user", sa.Column("status_message", sa.Text(), nullable=True))
-    op.add_column("user", sa.Column("status_expires_at", sa.BigInteger(), nullable=True))
+    op.add_column(
+        "user", sa.Column("status_expires_at", sa.BigInteger(), nullable=True)
+    )
 
     op.add_column("user", sa.Column("oauth", sa.JSON(), nullable=True))
 
@@ -193,7 +200,9 @@ def downgrade() -> None:
     op.add_column("user", sa.Column("oauth_sub", sa.Text(), nullable=True))
 
     conn = op.get_bind()
-    users = conn.execute(sa.text('SELECT id, oauth FROM "user" WHERE oauth IS NOT NULL')).fetchall()
+    users = conn.execute(
+        sa.text('SELECT id, oauth FROM "user" WHERE oauth IS NOT NULL')
+    ).fetchall()
 
     for uid, oauth in users:
         try:

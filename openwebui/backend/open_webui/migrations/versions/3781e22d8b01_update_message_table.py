@@ -38,8 +38,12 @@ def upgrade():
             "id", sa.Text(), nullable=False, primary_key=True, unique=True
         ),  # Unique reaction ID
         sa.Column("user_id", sa.Text(), nullable=False),  # User who reacted
-        sa.Column("message_id", sa.Text(), nullable=False),  # Message that was reacted to
-        sa.Column("name", sa.Text(), nullable=False),  # Reaction name (e.g. "thumbs_up")
+        sa.Column(
+            "message_id", sa.Text(), nullable=False
+        ),  # Message that was reacted to
+        sa.Column(
+            "name", sa.Text(), nullable=False
+        ),  # Reaction name (e.g. "thumbs_up")
         sa.Column(
             "created_at", sa.BigInteger(), nullable=True
         ),  # Timestamp of when the reaction was added

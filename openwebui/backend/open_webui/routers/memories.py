@@ -35,7 +35,9 @@ async def get_memories(
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
 
-    if not has_permission(user.id, "features.memories", request.app.state.config.USER_PERMISSIONS):
+    if not has_permission(
+        user.id, "features.memories", request.app.state.config.USER_PERMISSIONS
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
@@ -73,7 +75,9 @@ async def add_memory(
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
 
-    if not has_permission(user.id, "features.memories", request.app.state.config.USER_PERMISSIONS):
+    if not has_permission(
+        user.id, "features.memories", request.app.state.config.USER_PERMISSIONS
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
@@ -124,7 +128,9 @@ async def query_memory(
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
 
-    if not has_permission(user.id, "features.memories", request.app.state.config.USER_PERMISSIONS):
+    if not has_permission(
+        user.id, "features.memories", request.app.state.config.USER_PERMISSIONS
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
@@ -167,7 +173,9 @@ async def reset_memory_from_vector_db(
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
 
-    if not has_permission(user.id, "features.memories", request.app.state.config.USER_PERMISSIONS):
+    if not has_permission(
+        user.id, "features.memories", request.app.state.config.USER_PERMISSIONS
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
@@ -179,7 +187,10 @@ async def reset_memory_from_vector_db(
 
     # Generate vectors in parallel
     vectors = await asyncio.gather(
-        *[request.app.state.EMBEDDING_FUNCTION(memory.content, user=user) for memory in memories]
+        *[
+            request.app.state.EMBEDDING_FUNCTION(memory.content, user=user)
+            for memory in memories
+        ]
     )
 
     VECTOR_DB_CLIENT.upsert(
@@ -218,7 +229,9 @@ async def delete_memory_by_user_id(
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
 
-    if not has_permission(user.id, "features.memories", request.app.state.config.USER_PERMISSIONS):
+    if not has_permission(
+        user.id, "features.memories", request.app.state.config.USER_PERMISSIONS
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
@@ -258,13 +271,17 @@ async def update_memory_by_id(
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
 
-    if not has_permission(user.id, "features.memories", request.app.state.config.USER_PERMISSIONS):
+    if not has_permission(
+        user.id, "features.memories", request.app.state.config.USER_PERMISSIONS
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
         )
 
-    memory = Memories.update_memory_by_id_and_user_id(memory_id, user.id, form_data.content)
+    memory = Memories.update_memory_by_id_and_user_id(
+        memory_id, user.id, form_data.content
+    )
     if memory is None:
         raise HTTPException(status_code=404, detail="Memory not found")
 
@@ -307,7 +324,9 @@ async def delete_memory_by_id(
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
 
-    if not has_permission(user.id, "features.memories", request.app.state.config.USER_PERMISSIONS):
+    if not has_permission(
+        user.id, "features.memories", request.app.state.config.USER_PERMISSIONS
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
@@ -316,7 +335,9 @@ async def delete_memory_by_id(
     result = Memories.delete_memory_by_id_and_user_id(memory_id, user.id, db=db)
 
     if result:
-        VECTOR_DB_CLIENT.delete(collection_name=f"user-memory-{user.id}", ids=[memory_id])
+        VECTOR_DB_CLIENT.delete(
+            collection_name=f"user-memory-{user.id}", ids=[memory_id]
+        )
         return True
 
     return False

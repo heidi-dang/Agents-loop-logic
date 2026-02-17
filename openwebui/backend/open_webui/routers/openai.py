@@ -20,6 +20,9 @@ from fastapi.responses import (
 )
 from pydantic import BaseModel, ConfigDict
 
+from sqlalchemy.orm import Session
+
+from open_webui.internal.db import get_session
 
 from open_webui.models.models import Models
 from open_webui.models.access_grants import AccessGrants
@@ -230,9 +233,11 @@ async def update_config(
         if len(request.app.state.config.OPENAI_API_KEYS) > len(
             request.app.state.config.OPENAI_API_BASE_URLS
         ):
-            request.app.state.config.OPENAI_API_KEYS = request.app.state.config.OPENAI_API_KEYS[
-                : len(request.app.state.config.OPENAI_API_BASE_URLS)
-            ]
+            request.app.state.config.OPENAI_API_KEYS = (
+                request.app.state.config.OPENAI_API_KEYS[
+                    : len(request.app.state.config.OPENAI_API_BASE_URLS)
+                ]
+            )
         else:
             request.app.state.config.OPENAI_API_KEYS += [""] * (
                 len(request.app.state.config.OPENAI_API_BASE_URLS)
@@ -261,7 +266,9 @@ async def update_config(
 async def speech(request: Request, user=Depends(get_verified_user)):
     idx = None
     try:
-        idx = request.app.state.config.OPENAI_API_BASE_URLS.index("https://api.openai.com/v1")
+        idx = request.app.state.config.OPENAI_API_BASE_URLS.index(
+            "https://api.openai.com/v1"
+        )
 
         body = await request.body()
         name = hashlib.sha256(body).hexdigest()
@@ -282,7 +289,9 @@ async def speech(request: Request, user=Depends(get_verified_user)):
             request.app.state.config.OPENAI_API_CONFIGS.get(url, {}),  # Legacy support
         )
 
-        headers, cookies = await get_headers_and_cookies(request, url, key, api_config, user=user)
+        headers, cookies = await get_headers_and_cookies(
+            request, url, key, api_config, user=user
+        )
 
         r = None
         try:
@@ -396,7 +405,9 @@ async def get_all_models_responses(request: Request, user: UserModel) -> list:
                         ],
                     }
 
-                    request_tasks.append(asyncio.ensure_future(asyncio.sleep(0, model_list)))
+                    request_tasks.append(
+                        asyncio.ensure_future(asyncio.sleep(0, model_list))
+                    )
             else:
                 request_tasks.append(asyncio.ensure_future(asyncio.sleep(0, None)))
 
@@ -414,7 +425,9 @@ async def get_all_models_responses(request: Request, user: UserModel) -> list:
             prefix_id = api_config.get("prefix_id", None)
             tags = api_config.get("tags", [])
 
-            model_list = response if isinstance(response, list) else response.get("data", [])
+            model_list = (
+                response if isinstance(response, list) else response.get("data", [])
+            )
             if not isinstance(model_list, list):
                 # Catch non-list responses
                 model_list = []
@@ -425,7 +438,9 @@ async def get_all_models_responses(request: Request, user: UserModel) -> list:
                     del model["name"]
 
                 if prefix_id:
-                    model["id"] = f"{prefix_id}.{model.get('id', model.get('name', ''))}"
+                    model["id"] = (
+                        f"{prefix_id}.{model.get('id', model.get('name', ''))}"
+                    )
 
                 if tags:
                     model["tags"] = tags
@@ -441,9 +456,12 @@ async def get_filtered_models(models, user, db=None):
     # Filter models based on user access control
     model_ids = [model["id"] for model in models.get("data", [])]
     model_infos = {
-        model_info.id: model_info for model_info in Models.get_models_by_ids(model_ids, db=db)
+        model_info.id: model_info
+        for model_info in Models.get_models_by_ids(model_ids, db=db)
     }
-    user_group_ids = {group.id for group in Groups.get_groups_by_member_id(user.id, db=db)}
+    user_group_ids = {
+        group.id for group in Groups.get_groups_by_member_id(user.id, db=db)
+    }
 
     # Batch-fetch accessible resource IDs in a single query instead of N has_access calls
     accessible_model_ids = AccessGrants.get_accessible_resource_ids(
@@ -513,7 +531,9 @@ async def get_all_models(request: Request, user: UserModel) -> dict[str, list]:
 
                     base_url = api_base_urls[idx]
                     hostname = urlparse(base_url).hostname if base_url else None
-                    if hostname == "api.openai.com" and not is_supported_openai_models(model_id):
+                    if hostname == "api.openai.com" and not is_supported_openai_models(
+                        model_id
+                    ):
                         # Skip unwanted OpenAI models
                         continue
 
@@ -617,7 +637,9 @@ async def get_models(
             except aiohttp.ClientError as e:
                 # ClientError covers all aiohttp requests issues
                 log.exception(f"Client error: {str(e)}")
-                raise HTTPException(status_code=500, detail="Open WebUI: Server Connection Error")
+                raise HTTPException(
+                    status_code=500, detail="Open WebUI: Server Connection Error"
+                )
             except Exception as e:
                 log.exception(f"Unexpected error: {e}")
                 error_detail = f"Unexpected error: {str(e)}"
@@ -676,9 +698,13 @@ async def verify_connection(
 
                     if r.status != 200:
                         if isinstance(response_data, (dict, list)):
-                            return JSONResponse(status_code=r.status, content=response_data)
+                            return JSONResponse(
+                                status_code=r.status, content=response_data
+                            )
                         else:
-                            return PlainTextResponse(status_code=r.status, content=response_data)
+                            return PlainTextResponse(
+                                status_code=r.status, content=response_data
+                            )
 
                     return response_data
             else:
@@ -695,19 +721,27 @@ async def verify_connection(
 
                     if r.status != 200:
                         if isinstance(response_data, (dict, list)):
-                            return JSONResponse(status_code=r.status, content=response_data)
+                            return JSONResponse(
+                                status_code=r.status, content=response_data
+                            )
                         else:
-                            return PlainTextResponse(status_code=r.status, content=response_data)
+                            return PlainTextResponse(
+                                status_code=r.status, content=response_data
+                            )
 
                     return response_data
 
         except aiohttp.ClientError as e:
             # ClientError covers all aiohttp requests issues
             log.exception(f"Client error: {str(e)}")
-            raise HTTPException(status_code=500, detail="Open WebUI: Server Connection Error")
+            raise HTTPException(
+                status_code=500, detail="Open WebUI: Server Connection Error"
+            )
         except Exception as e:
             log.exception(f"Unexpected error: {e}")
-            raise HTTPException(status_code=500, detail="Open WebUI: Server Connection Error")
+            raise HTTPException(
+                status_code=500, detail="Open WebUI: Server Connection Error"
+            )
 
 
 def get_azure_allowed_params(api_version: str) -> set[str]:
@@ -823,10 +857,16 @@ def convert_to_responses_payload(payload: dict) -> dict:
             content_parts = []
             for part in content:
                 if part.get("type") == "text":
-                    content_parts.append({"type": text_type, "text": part.get("text", "")})
+                    content_parts.append(
+                        {"type": text_type, "text": part.get("text", "")}
+                    )
                 elif part.get("type") == "image_url":
                     url_data = part.get("image_url", {})
-                    url = url_data.get("url", "") if isinstance(url_data, dict) else url_data
+                    url = (
+                        url_data.get("url", "")
+                        if isinstance(url_data, dict)
+                        else url_data
+                    )
                     content_parts.append({"type": "input_image", "image_url": url})
         else:
             content_parts = [{"type": text_type, "text": str(content)}]
@@ -931,7 +971,9 @@ async def generate_chat_completion(
 
         # Check if user has access to the model
         if not bypass_filter and user.role == "user":
-            user_group_ids = {group.id for group in Groups.get_groups_by_member_id(user.id)}
+            user_group_ids = {
+                group.id for group in Groups.get_groups_by_member_id(user.id)
+            }
             if not (
                 user.id == model_info.user_id
                 or AccessGrants.has_access(
@@ -1135,7 +1177,9 @@ async def embeddings(request: Request, form_data: dict, user):
     session = None
     streaming = False
 
-    headers, cookies = await get_headers_and_cookies(request, url, key, api_config, user=user)
+    headers, cookies = await get_headers_and_cookies(
+        request, url, key, api_config, user=user
+    )
     try:
         session = aiohttp.ClientSession(trust_env=True)
         r = await session.request(
@@ -1163,7 +1207,9 @@ async def embeddings(request: Request, form_data: dict, user):
                 if isinstance(response_data, (dict, list)):
                     return JSONResponse(status_code=r.status, content=response_data)
                 else:
-                    return PlainTextResponse(status_code=r.status, content=response_data)
+                    return PlainTextResponse(
+                        status_code=r.status, content=response_data
+                    )
 
             return response_data
     except Exception as e:
@@ -1232,7 +1278,9 @@ async def responses(
     streaming = False
 
     try:
-        headers, cookies = await get_headers_and_cookies(request, url, key, api_config, user=user)
+        headers, cookies = await get_headers_and_cookies(
+            request, url, key, api_config, user=user
+        )
 
         if api_config.get("azure", False):
             api_version = api_config.get("api_version", "2023-03-15-preview")
@@ -1244,7 +1292,9 @@ async def responses(
             headers["api-version"] = api_version
 
             model = payload.get("model", "")
-            request_url = f"{url}/openai/deployments/{model}/responses?api-version={api_version}"
+            request_url = (
+                f"{url}/openai/deployments/{model}/responses?api-version={api_version}"
+            )
         else:
             request_url = f"{url}/responses"
 
@@ -1279,7 +1329,9 @@ async def responses(
                 if isinstance(response_data, (dict, list)):
                     return JSONResponse(status_code=r.status, content=response_data)
                 else:
-                    return PlainTextResponse(status_code=r.status, content=response_data)
+                    return PlainTextResponse(
+                        status_code=r.status, content=response_data
+                    )
 
             return response_data
 
@@ -1334,7 +1386,9 @@ async def proxy(path: str, request: Request, user=Depends(get_verified_user)):
     streaming = False
 
     try:
-        headers, cookies = await get_headers_and_cookies(request, url, key, api_config, user=user)
+        headers, cookies = await get_headers_and_cookies(
+            request, url, key, api_config, user=user
+        )
 
         if api_config.get("azure", False):
             api_version = api_config.get("api_version", "2023-03-15-preview")
@@ -1382,7 +1436,9 @@ async def proxy(path: str, request: Request, user=Depends(get_verified_user)):
                 if isinstance(response_data, (dict, list)):
                     return JSONResponse(status_code=r.status, content=response_data)
                 else:
-                    return PlainTextResponse(status_code=r.status, content=response_data)
+                    return PlainTextResponse(
+                        status_code=r.status, content=response_data
+                    )
 
             return response_data
 

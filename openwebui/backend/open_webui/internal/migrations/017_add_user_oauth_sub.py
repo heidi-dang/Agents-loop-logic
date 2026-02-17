@@ -26,7 +26,7 @@ import peewee as pw
 from peewee_migrate import Migrator
 
 with suppress(ImportError):
-    pass
+    import playhouse.postgres_ext as pw_pext
 
 
 def migrate(migrator: Migrator, database: pw.Database, *, fake=False):

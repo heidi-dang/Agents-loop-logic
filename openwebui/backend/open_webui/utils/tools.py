@@ -1,27 +1,33 @@
 import inspect
 import logging
 import re
+import inspect
 import aiohttp
 import asyncio
 import yaml
 import json
 
 from pydantic import BaseModel
+from pydantic.fields import FieldInfo
 from typing import (
     Any,
     Awaitable,
     Callable,
     get_type_hints,
+    get_args,
+    get_origin,
     Dict,
     List,
     Tuple,
+    Union,
     Optional,
+    Type,
 )
 from functools import update_wrapper, partial
 
 
 from fastapi import Request
-from pydantic import Field, create_model
+from pydantic import BaseModel, Field, create_model
 
 from langchain_core.utils.function_calling import (
     convert_to_openai_function as convert_pydantic_model_to_openai_function_spec,
@@ -97,7 +103,9 @@ def get_async_tool_function_and_apply_extra_params(
         # Keep remaining parameters
         parameters.append(parameter)
 
-    new_sig = inspect.Signature(parameters=parameters, return_annotation=sig.return_annotation)
+    new_sig = inspect.Signature(
+        parameters=parameters, return_annotation=sig.return_annotation
+    )
 
     if inspect.iscoroutinefunction(function):
         # wrap the functools.partial as python-genai has trouble with it
@@ -232,14 +240,17 @@ async def get_tools(
                     "spec": spec,
                     # Misc info
                     "metadata": {
-                        "file_handler": hasattr(module, "file_handler") and module.file_handler,
+                        "file_handler": hasattr(module, "file_handler")
+                        and module.file_handler,
                         "citation": hasattr(module, "citation") and module.citation,
                     },
                 }
 
                 # Handle function name collisions
                 while function_name in tools_dict:
-                    log.warning(f"Tool {function_name} already exists in another tools!")
+                    log.warning(
+                        f"Tool {function_name} already exists in another tools!"
+                    )
                     # Prepend tool ID to function name
                     function_name = f"{tool_id}_{function_name}"
 
@@ -258,9 +269,10 @@ async def get_tools(
                 server_id_splits = server_id.split("|")
                 if len(server_id_splits) == 2:
                     server_id = server_id_splits[0]
-                    server_id_splits[1].split(",")
+                    function_names = server_id_splits[1].split(",")
 
                 if type == "openapi":
+
                     tool_server_data = None
                     for server in await get_tool_servers(request):
                         if server["id"] == server_id:
@@ -272,19 +284,25 @@ async def get_tools(
                         continue
 
                     tool_server_idx = tool_server_data.get("idx", 0)
-                    tool_server_connection = request.app.state.config.TOOL_SERVER_CONNECTIONS[
-                        tool_server_idx
-                    ]
+                    tool_server_connection = (
+                        request.app.state.config.TOOL_SERVER_CONNECTIONS[
+                            tool_server_idx
+                        ]
+                    )
 
                     # Check access control for tool server
-                    if not has_tool_server_access(user, tool_server_connection, user_group_ids):
-                        log.warning(f"Access denied to tool server {server_id} for user {user.id}")
+                    if not has_tool_server_access(
+                        user, tool_server_connection, user_group_ids
+                    ):
+                        log.warning(
+                            f"Access denied to tool server {server_id} for user {user.id}"
+                        )
                         continue
 
                     specs = tool_server_data.get("specs", [])
-                    function_name_filter_list = tool_server_connection.get("config", {}).get(
-                        "function_name_filter_list", ""
-                    )
+                    function_name_filter_list = tool_server_connection.get(
+                        "config", {}
+                    ).get("function_name_filter_list", "")
 
                     if isinstance(function_name_filter_list, str):
                         function_name_filter_list = function_name_filter_list.split(",")
@@ -292,7 +310,9 @@ async def get_tools(
                     for spec in specs:
                         function_name = spec["name"]
                         if function_name_filter_list:
-                            if not is_string_allowed(function_name, function_name_filter_list):
+                            if not is_string_allowed(
+                                function_name, function_name_filter_list
+                            ):
                                 # Skip this function
                                 continue
 
@@ -312,7 +332,9 @@ async def get_tools(
                             pass
                         elif auth_type == "session":
                             cookies = request.cookies
-                            headers["Authorization"] = f"Bearer {request.state.token.credentials}"
+                            headers["Authorization"] = (
+                                f"Bearer {request.state.token.credentials}"
+                            )
                         elif auth_type == "system_oauth":
                             cookies = request.cookies
                             oauth_token = extra_params.get("__oauth_token__", None)
@@ -331,15 +353,17 @@ async def get_tools(
                             headers = include_user_info_headers(headers, user)
                             metadata = extra_params.get("__metadata__", {})
                             if metadata and metadata.get("chat_id"):
-                                headers[FORWARD_SESSION_INFO_HEADER_CHAT_ID] = metadata.get(
-                                    "chat_id"
+                                headers[FORWARD_SESSION_INFO_HEADER_CHAT_ID] = (
+                                    metadata.get("chat_id")
                                 )
                             if metadata and metadata.get("message_id"):
-                                headers[FORWARD_SESSION_INFO_HEADER_MESSAGE_ID] = metadata.get(
-                                    "message_id"
+                                headers[FORWARD_SESSION_INFO_HEADER_MESSAGE_ID] = (
+                                    metadata.get("message_id")
                                 )
 
-                        def make_tool_function(function_name, tool_server_data, headers):
+                        def make_tool_function(
+                            function_name, tool_server_data, headers
+                        ):
                             async def tool_function(**kwargs):
                                 return await execute_tool_server(
                                     url=tool_server_data["url"],
@@ -352,7 +376,9 @@ async def get_tools(
 
                             return tool_function
 
-                        tool_function = make_tool_function(function_name, tool_server_data, headers)
+                        tool_function = make_tool_function(
+                            function_name, tool_server_data, headers
+                        )
 
                         callable = get_async_tool_function_and_apply_extra_params(
                             tool_function,
@@ -369,7 +395,9 @@ async def get_tools(
 
                         # Handle function name collisions
                         while function_name in tools_dict:
-                            log.warning(f"Tool {function_name} already exists in another tools!")
+                            log.warning(
+                                f"Tool {function_name} already exists in another tools!"
+                            )
                             # Prepend server ID to function name
                             function_name = f"{server_id}_{function_name}"
 
@@ -395,7 +423,9 @@ def get_builtin_tools(
 
     # Helper to get model capabilities (defaults to True if not specified)
     def get_model_capability(name: str, default: bool = True) -> bool:
-        return (model.get("info", {}).get("meta", {}).get("capabilities") or {}).get(name, default)
+        return (model.get("info", {}).get("meta", {}).get("capabilities") or {}).get(
+            name, default
+        )
 
     # Helper to check if a builtin tool category is enabled via meta.builtinTools
     # Defaults to True if not specified (backward compatible)
@@ -470,7 +500,9 @@ def get_builtin_tools(
     if is_builtin_tool_enabled("notes") and getattr(
         request.app.state.config, "ENABLE_NOTES", False
     ):
-        builtin_functions.extend([search_notes, view_note, write_note, replace_note_content])
+        builtin_functions.extend(
+            [search_notes, view_note, write_note, replace_note_content]
+        )
 
     # Channels tools - search channels and messages (if builtin category enabled AND channels enabled globally)
     if is_builtin_tool_enabled("channels") and getattr(
@@ -632,7 +664,9 @@ def get_functions_from_tool(tool: object) -> list[Callable]:
 
 
 def get_tool_specs(tool_module: object) -> list[dict]:
-    function_models = map(convert_function_to_pydantic_model, get_functions_from_tool(tool_module))
+    function_models = map(
+        convert_function_to_pydantic_model, get_functions_from_tool(tool_module)
+    )
 
     specs = [
         convert_pydantic_model_to_openai_function_spec(function_model)
@@ -662,7 +696,9 @@ def resolve_schema(schema, components):
     # Recursively resolve inner schemas
     if "properties" in resolved_schema:
         for prop, prop_schema in resolved_schema["properties"].items():
-            resolved_schema["properties"][prop] = resolve_schema(prop_schema, components)
+            resolved_schema["properties"][prop] = resolve_schema(
+                prop_schema, components
+            )
 
     if "items" in resolved_schema:
         resolved_schema["items"] = resolve_schema(resolved_schema["items"], components)
@@ -702,8 +738,12 @@ def convert_openapi_to_tool_payload(openapi_spec):
                     description = param_schema.get("description", "")
                     if not description:
                         description = param.get("description") or ""
-                    if param_schema.get("enum") and isinstance(param_schema.get("enum"), list):
-                        description += f". Possible values: {', '.join(param_schema.get('enum'))}"
+                    if param_schema.get("enum") and isinstance(
+                        param_schema.get("enum"), list
+                    ):
+                        description += (
+                            f". Possible values: {', '.join(param_schema.get('enum'))}"
+                        )
                     param_property = {
                         "type": param_schema.get("type"),
                         "description": description,
@@ -728,15 +768,20 @@ def convert_openapi_to_tool_payload(openapi_spec):
                         )
 
                         if resolved_schema.get("properties"):
-                            tool["parameters"]["properties"].update(resolved_schema["properties"])
+                            tool["parameters"]["properties"].update(
+                                resolved_schema["properties"]
+                            )
                             if "required" in resolved_schema:
                                 tool["parameters"]["required"] = list(
                                     set(
-                                        tool["parameters"]["required"] + resolved_schema["required"]
+                                        tool["parameters"]["required"]
+                                        + resolved_schema["required"]
                                     )
                                 )
                         elif resolved_schema.get("type") == "array":
-                            tool["parameters"] = resolved_schema  # special case for array
+                            tool["parameters"] = (
+                                resolved_schema  # special case for array
+                            )
 
                 tool_payload.append(tool)
 
@@ -826,7 +871,10 @@ async def get_tool_servers_data(servers: List[Dict[str, Any]]) -> List[Dict[str,
     tasks = []
     server_entries = []
     for idx, server in enumerate(servers):
-        if server.get("config", {}).get("enable") and server.get("type", "openapi") == "openapi":
+        if (
+            server.get("config", {}).get("enable")
+            and server.get("type", "openapi") == "openapi"
+        ):
             info = server.get("info", {})
 
             auth_type = server.get("auth_type", "bearer")

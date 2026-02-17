@@ -1,8 +1,9 @@
+import json
 import logging
 from typing import Optional
 
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status, BackgroundTasks
 from pydantic import BaseModel
 
 from open_webui.socket.main import sio
@@ -19,11 +20,13 @@ from open_webui.models.notes import (
 
 from open_webui.config import (
     BYPASS_ADMIN_ACCESS_CONTROL,
+    ENABLE_ADMIN_CHAT_ACCESS,
+    ENABLE_ADMIN_EXPORT,
 )
 from open_webui.constants import ERROR_MESSAGES
 
 
-from open_webui.utils.auth import get_verified_user
+from open_webui.utils.auth import get_admin_user, get_verified_user
 from open_webui.utils.access_control import has_permission
 from open_webui.models.access_grants import AccessGrants, has_public_read_access_grant
 from open_webui.internal.db import get_session
@@ -191,7 +194,9 @@ async def get_note_by_id(
 
     note = Notes.get_note_by_id(id, db=db)
     if not note:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.NOT_FOUND)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.NOT_FOUND
+        )
 
     if user.role != "admin" and (
         user.id != note.user_id
@@ -205,7 +210,9 @@ async def get_note_by_id(
             )
         )
     ):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.DEFAULT())
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.DEFAULT()
+        )
 
     write_access = (
         user.role == "admin"
@@ -246,7 +253,9 @@ async def update_note_by_id(
 
     note = Notes.get_note_by_id(id, db=db)
     if not note:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.NOT_FOUND)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.NOT_FOUND
+        )
 
     if user.role != "admin" and (
         user.id != note.user_id
@@ -258,7 +267,9 @@ async def update_note_by_id(
             db=db,
         )
     ):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.DEFAULT())
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.DEFAULT()
+        )
 
     # Check if user can share publicly
     if (
@@ -316,7 +327,9 @@ async def update_note_access_by_id(
 
     note = Notes.get_note_by_id(id, db=db)
     if not note:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.NOT_FOUND)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.NOT_FOUND
+        )
 
     if user.role != "admin" and (
         user.id != note.user_id
@@ -328,7 +341,9 @@ async def update_note_access_by_id(
             db=db,
         )
     ):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.DEFAULT())
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.DEFAULT()
+        )
 
     # Strip public sharing if user lacks permission
     if (
@@ -343,7 +358,10 @@ async def update_note_access_by_id(
         form_data.access_grants = [
             grant
             for grant in form_data.access_grants
-            if not (grant.get("principal_type") == "user" and grant.get("principal_id") == "*")
+            if not (
+                grant.get("principal_type") == "user"
+                and grant.get("principal_id") == "*"
+            )
         ]
 
     AccessGrants.set_access_grants("note", id, form_data.access_grants, db=db)
@@ -373,7 +391,9 @@ async def delete_note_by_id(
 
     note = Notes.get_note_by_id(id, db=db)
     if not note:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.NOT_FOUND)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.NOT_FOUND
+        )
 
     if user.role != "admin" and (
         user.id != note.user_id
@@ -385,7 +405,9 @@ async def delete_note_by_id(
             db=db,
         )
     ):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.DEFAULT())
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.DEFAULT()
+        )
 
     try:
         note = Notes.delete_note_by_id(id, db=db)

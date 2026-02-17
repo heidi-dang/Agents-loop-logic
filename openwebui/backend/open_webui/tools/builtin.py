@@ -33,8 +33,8 @@ from open_webui.routers.memories import (
 )
 from open_webui.models.notes import Notes
 from open_webui.models.chats import Chats
-from open_webui.models.channels import Channels
-from open_webui.models.messages import Messages
+from open_webui.models.channels import Channels, ChannelMember, Channel
+from open_webui.models.messages import Messages, Message
 from open_webui.models.groups import Groups
 from open_webui.utils.sanitize import sanitize_code
 
@@ -403,7 +403,9 @@ async def execute_code(
                 """)
             code = blocking_code + "\n" + code
 
-        engine = getattr(__request__.app.state.config, "CODE_INTERPRETER_ENGINE", "pyodide")
+        engine = getattr(
+            __request__.app.state.config, "CODE_INTERPRETER_ENGINE", "pyodide"
+        )
         if engine == "pyodide":
             # Execute via frontend pyodide using bidirectional event call
             if __event_call__ is None:
@@ -419,7 +421,9 @@ async def execute_code(
                     "data": {
                         "id": str(uuid4()),
                         "code": code,
-                        "session_id": (__metadata__.get("session_id") if __metadata__ else None),
+                        "session_id": (
+                            __metadata__.get("session_id") if __metadata__ else None
+                        ),
                     },
                 }
             )
@@ -442,12 +446,14 @@ async def execute_code(
                 code,
                 (
                     __request__.app.state.config.CODE_INTERPRETER_JUPYTER_AUTH_TOKEN
-                    if __request__.app.state.config.CODE_INTERPRETER_JUPYTER_AUTH == "token"
+                    if __request__.app.state.config.CODE_INTERPRETER_JUPYTER_AUTH
+                    == "token"
                     else None
                 ),
                 (
                     __request__.app.state.config.CODE_INTERPRETER_JUPYTER_AUTH_PASSWORD
-                    if __request__.app.state.config.CODE_INTERPRETER_JUPYTER_AUTH == "password"
+                    if __request__.app.state.config.CODE_INTERPRETER_JUPYTER_AUTH
+                    == "password"
                     else None
                 ),
                 __request__.app.state.config.CODE_INTERPRETER_JUPYTER_TIMEOUT,
@@ -548,7 +554,9 @@ async def search_memories(
                 if results.ids and results.ids[0]:
                     memory_id = results.ids[0][doc_idx]
                 created_at = "Unknown"
-                if results.metadatas and results.metadatas[0][doc_idx].get("created_at"):
+                if results.metadatas and results.metadatas[0][doc_idx].get(
+                    "created_at"
+                ):
                     created_at = time.strftime(
                         "%Y-%m-%d",
                         time.localtime(results.metadatas[0][doc_idx]["created_at"]),
@@ -698,7 +706,9 @@ async def search_notes(
                         + ("..." if end < len(md_content) else "")
                     )
                 else:
-                    content_snippet = md_content[:150] + ("..." if len(md_content) > 150 else "")
+                    content_snippet = md_content[:150] + (
+                        "..." if len(md_content) > 150 else ""
+                    )
 
             notes.append(
                 {
@@ -1852,7 +1862,9 @@ async def query_knowledge_bases(
                     if len(top_results_heap) < count:
                         heapq.heappush(top_results_heap, (distance, knowledge_base_id))
                     elif distance > top_results_heap[0][0]:
-                        heapq.heapreplace(top_results_heap, (distance, knowledge_base_id))
+                        heapq.heapreplace(
+                            top_results_heap, (distance, knowledge_base_id)
+                        )
 
             page_offset += page_size
             if len(accessible_knowledge_bases.items) < page_size:
@@ -1921,7 +1933,9 @@ async def view_skill(
         # Check user access
         user_role = __user__.get("role", "user")
         if user_role != "admin" and skill.user_id != user_id:
-            user_group_ids = [group.id for group in Groups.get_groups_by_member_id(user_id)]
+            user_group_ids = [
+                group.id for group in Groups.get_groups_by_member_id(user_id)
+            ]
             if not AccessGrants.has_access(
                 user_id=user_id,
                 resource_type="skill",

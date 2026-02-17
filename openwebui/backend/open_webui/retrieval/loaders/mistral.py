@@ -53,7 +53,9 @@ class MistralLoader:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found at {file_path}")
 
-        self.base_url = base_url.rstrip("/") if base_url else "https://api.mistral.ai/v1"
+        self.base_url = (
+            base_url.rstrip("/") if base_url else "https://api.mistral.ai/v1"
+        )
         self.api_key = api_key
         self.file_path = file_path
         self.timeout = timeout
@@ -66,9 +68,15 @@ class MistralLoader:
         self.upload_timeout = min(
             timeout, 120
         )  # Cap upload at 2 minutes - prevents hanging on large files
-        self.url_timeout = 30  # URL requests should be fast - fail quickly if API is slow
-        self.ocr_timeout = timeout  # OCR can take the full timeout - this is the heavy operation
-        self.cleanup_timeout = 30  # Cleanup should be quick - don't hang on file deletion
+        self.url_timeout = (
+            30  # URL requests should be fast - fail quickly if API is slow
+        )
+        self.ocr_timeout = (
+            timeout  # OCR can take the full timeout - this is the heavy operation
+        )
+        self.cleanup_timeout = (
+            30  # Cleanup should be quick - don't hang on file deletion
+        )
 
         # PERFORMANCE OPTIMIZATION: Pre-compute file info to avoid repeated filesystem calls
         # This avoids multiple os.path.basename() and os.path.getsize() calls during processing
@@ -109,7 +117,9 @@ class MistralLoader:
             log.error(f"JSON decode error: {json_err} - Response: {response.text}")
             raise  # Re-raise after logging
 
-    async def _handle_response_async(self, response: aiohttp.ClientResponse) -> Dict[str, Any]:
+    async def _handle_response_async(
+        self, response: aiohttp.ClientResponse
+    ) -> Dict[str, Any]:
         """Async version of response handling with better error info."""
         try:
             response.raise_for_status()
@@ -120,7 +130,9 @@ class MistralLoader:
                 if response.status == 204:
                     return {}
                 text = await response.text()
-                raise ValueError(f"Unexpected content type: {content_type}, body: {text[:200]}...")
+                raise ValueError(
+                    f"Unexpected content type: {content_type}, body: {text[:200]}..."
+                )
 
             return await response.json()
 
@@ -164,7 +176,9 @@ class MistralLoader:
                 status_code = error.response.status_code
                 return status_code >= 500 or status_code == 429
             return False
-        if isinstance(error, (aiohttp.ClientConnectionError, aiohttp.ServerTimeoutError)):
+        if isinstance(
+            error, (aiohttp.ClientConnectionError, aiohttp.ServerTimeoutError)
+        ):
             return True  # Async network/timeout errors are retryable
         if isinstance(error, aiohttp.ClientResponseError):
             return error.status >= 500 or error.status == 429
@@ -280,9 +294,13 @@ class MistralLoader:
                     content_type="application/pdf",
                 )
             )
-            file_part.set_content_disposition("form-data", name="file", filename=self.file_name)
+            file_part.set_content_disposition(
+                "form-data", name="file", filename=self.file_name
+            )
 
-            self._debug_log(f"Uploading file: {self.file_name} ({self.file_size:,} bytes)")
+            self._debug_log(
+                f"Uploading file: {self.file_name} ({self.file_size:,} bytes)"
+            )
 
             async with session.post(
                 url,
@@ -325,7 +343,9 @@ class MistralLoader:
             log.error(f"Failed to get signed URL: {e}")
             raise
 
-    async def _get_signed_url_async(self, session: aiohttp.ClientSession, file_id: str) -> str:
+    async def _get_signed_url_async(
+        self, session: aiohttp.ClientSession, file_id: str
+    ) -> str:
         """Async signed URL retrieval."""
         url = f"{self.base_url}/files/{file_id}/url"
         params = {"expiry": 1}
@@ -430,14 +450,18 @@ class MistralLoader:
         url = f"{self.base_url}/files/{file_id}"
 
         try:
-            response = requests.delete(url, headers=self.headers, timeout=self.cleanup_timeout)
+            response = requests.delete(
+                url, headers=self.headers, timeout=self.cleanup_timeout
+            )
             delete_response = self._handle_response(response)
             log.info(f"File deleted successfully: {delete_response}")
         except Exception as e:
             # Log error but don't necessarily halt execution if deletion fails
             log.error(f"Failed to delete file ID {file_id}: {e}")
 
-    async def _delete_file_async(self, session: aiohttp.ClientSession, file_id: str) -> None:
+    async def _delete_file_async(
+        self, session: aiohttp.ClientSession, file_id: str
+    ) -> None:
         """Async file deletion with error tolerance."""
         try:
 
@@ -550,7 +574,9 @@ class MistralLoader:
 
         if not documents:
             # Case where pages existed but none had valid markdown/index
-            log.warning("OCR response contained pages, but none had valid content/index.")
+            log.warning(
+                "OCR response contained pages, but none had valid content/index."
+            )
             return [
                 Document(
                     page_content="No valid text content found in document",
@@ -597,7 +623,9 @@ class MistralLoader:
 
         except Exception as e:
             total_time = time.time() - start_time
-            log.error(f"An error occurred during the loading process after {total_time:.2f}s: {e}")
+            log.error(
+                f"An error occurred during the loading process after {total_time:.2f}s: {e}"
+            )
             # Return an error document on failure
             return [
                 Document(
@@ -615,7 +643,9 @@ class MistralLoader:
                     self._delete_file(file_id)
                 except Exception as del_e:
                     # Log deletion error, but don't overwrite original error if one occurred
-                    log.error(f"Cleanup error: Could not delete file ID {file_id}. Reason: {del_e}")
+                    log.error(
+                        f"Cleanup error: Could not delete file ID {file_id}. Reason: {del_e}"
+                    )
 
     async def load_async(self) -> List[Document]:
         """
@@ -725,7 +755,9 @@ class MistralLoader:
         # MONITORING: Log comprehensive batch processing statistics
         total_time = time.time() - start_time
         total_docs = sum(len(docs) for docs in processed_results)
-        success_count = sum(1 for result in results if not isinstance(result, Exception))
+        success_count = sum(
+            1 for result in results if not isinstance(result, Exception)
+        )
         failure_count = len(results) - success_count
 
         log.info(

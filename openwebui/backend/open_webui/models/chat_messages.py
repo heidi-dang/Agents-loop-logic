@@ -1,4 +1,6 @@
+import json
 import time
+import uuid
 from typing import Any, Optional
 
 from sqlalchemy.orm import Session
@@ -49,7 +51,9 @@ class ChatMessage(Base):
 
     # Identity
     id = Column(Text, primary_key=True)
-    chat_id = Column(Text, ForeignKey("chat.id", ondelete="CASCADE"), nullable=False, index=True)
+    chat_id = Column(
+        Text, ForeignKey("chat.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     user_id = Column(Text, index=True)
 
     # Structure
@@ -194,7 +198,8 @@ class ChatMessageTable:
                     sources=data.get("sources"),
                     embeds=data.get("embeds"),
                     done=data.get("done", True),
-                    status_history=data.get("status_history") or data.get("statusHistory"),
+                    status_history=data.get("status_history")
+                    or data.get("statusHistory"),
                     error=data.get("error"),
                     usage=usage,
                     created_at=timestamp,
@@ -257,7 +262,12 @@ class ChatMessageTable:
                 query = query.filter(ChatMessage.created_at >= start_date)
             if end_date:
                 query = query.filter(ChatMessage.created_at <= end_date)
-            messages = query.order_by(ChatMessage.created_at.desc()).offset(skip).limit(limit).all()
+            messages = (
+                query.order_by(ChatMessage.created_at.desc())
+                .offset(skip)
+                .limit(limit)
+                .all()
+            )
             return [ChatMessageModel.model_validate(message) for message in messages]
 
     def get_chat_ids_by_model_id(
@@ -291,7 +301,9 @@ class ChatMessageTable:
             )
             return [chat_id for chat_id, _ in chat_ids]
 
-    def delete_messages_by_chat_id(self, chat_id: str, db: Optional[Session] = None) -> bool:
+    def delete_messages_by_chat_id(
+        self, chat_id: str, db: Optional[Session] = None
+    ) -> bool:
         with get_db_context(db) as db:
             db.query(ChatMessage).filter_by(chat_id=chat_id).delete()
             db.commit()
@@ -347,7 +359,9 @@ class ChatMessageTable:
             dialect = db.bind.dialect.name
 
             if dialect == "sqlite":
-                input_tokens = cast(func.json_extract(ChatMessage.usage, "$.input_tokens"), Integer)
+                input_tokens = cast(
+                    func.json_extract(ChatMessage.usage, "$.input_tokens"), Integer
+                )
                 output_tokens = cast(
                     func.json_extract(ChatMessage.usage, "$.output_tokens"), Integer
                 )
@@ -413,7 +427,9 @@ class ChatMessageTable:
             dialect = db.bind.dialect.name
 
             if dialect == "sqlite":
-                input_tokens = cast(func.json_extract(ChatMessage.usage, "$.input_tokens"), Integer)
+                input_tokens = cast(
+                    func.json_extract(ChatMessage.usage, "$.input_tokens"), Integer
+                )
                 output_tokens = cast(
                     func.json_extract(ChatMessage.usage, "$.output_tokens"), Integer
                 )
@@ -470,9 +486,9 @@ class ChatMessageTable:
             from sqlalchemy import func
             from open_webui.models.groups import GroupMember
 
-            query = db.query(ChatMessage.user_id, func.count(ChatMessage.id).label("count")).filter(
-                ~ChatMessage.user_id.like("shared-%")
-            )
+            query = db.query(
+                ChatMessage.user_id, func.count(ChatMessage.id).label("count")
+            ).filter(~ChatMessage.user_id.like("shared-%"))
 
             if start_date:
                 query = query.filter(ChatMessage.created_at >= start_date)
@@ -500,9 +516,9 @@ class ChatMessageTable:
             from sqlalchemy import func
             from open_webui.models.groups import GroupMember
 
-            query = db.query(ChatMessage.chat_id, func.count(ChatMessage.id).label("count")).filter(
-                ~ChatMessage.user_id.like("shared-%")
-            )
+            query = db.query(
+                ChatMessage.chat_id, func.count(ChatMessage.id).label("count")
+            ).filter(~ChatMessage.user_id.like("shared-%"))
 
             if start_date:
                 query = query.filter(ChatMessage.created_at >= start_date)
@@ -554,12 +570,14 @@ class ChatMessageTable:
             # Group by date -> model -> count
             daily_counts: dict[str, dict[str, int]] = {}
             for timestamp, model_id in results:
-                date_str = datetime.fromtimestamp(_normalize_timestamp(timestamp)).strftime(
-                    "%Y-%m-%d"
-                )
+                date_str = datetime.fromtimestamp(
+                    _normalize_timestamp(timestamp)
+                ).strftime("%Y-%m-%d")
                 if date_str not in daily_counts:
                     daily_counts[date_str] = {}
-                daily_counts[date_str][model_id] = daily_counts[date_str].get(model_id, 0) + 1
+                daily_counts[date_str][model_id] = (
+                    daily_counts[date_str].get(model_id, 0) + 1
+                )
 
             # Fill in missing days
             if start_date and end_date:
@@ -599,18 +617,20 @@ class ChatMessageTable:
             # Group by hour -> model -> count
             hourly_counts: dict[str, dict[str, int]] = {}
             for timestamp, model_id in results:
-                hour_str = datetime.fromtimestamp(_normalize_timestamp(timestamp)).strftime(
-                    "%Y-%m-%d %H:00"
-                )
+                hour_str = datetime.fromtimestamp(
+                    _normalize_timestamp(timestamp)
+                ).strftime("%Y-%m-%d %H:00")
                 if hour_str not in hourly_counts:
                     hourly_counts[hour_str] = {}
-                hourly_counts[hour_str][model_id] = hourly_counts[hour_str].get(model_id, 0) + 1
+                hourly_counts[hour_str][model_id] = (
+                    hourly_counts[hour_str].get(model_id, 0) + 1
+                )
 
             # Fill in missing hours
             if start_date and end_date:
-                current = datetime.fromtimestamp(_normalize_timestamp(start_date)).replace(
-                    minute=0, second=0, microsecond=0
-                )
+                current = datetime.fromtimestamp(
+                    _normalize_timestamp(start_date)
+                ).replace(minute=0, second=0, microsecond=0)
                 end_dt = datetime.fromtimestamp(_normalize_timestamp(end_date))
                 while current <= end_dt:
                     hour_str = current.strftime("%Y-%m-%d %H:00")

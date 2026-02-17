@@ -68,7 +68,9 @@ def validate_url(url: Union[str, Sequence[str]]):
 
         # Protocol validation - only allow http/https
         if parsed_url.scheme not in ["http", "https"]:
-            log.warning(f"Blocked non-HTTP(S) protocol: {parsed_url.scheme} in URL: {url}")
+            log.warning(
+                f"Blocked non-HTTP(S) protocol: {parsed_url.scheme} in URL: {url}"
+            )
             raise ValueError(ERROR_MESSAGES.INVALID_URL)
 
         # Blocklist check using unified filtering logic
@@ -523,7 +525,9 @@ class SafePlaywrightURLLoader(PlaywrightURLLoader, RateLimitMixin, URLProcessing
             if self.playwright_ws_url:
                 browser = await p.chromium.connect(self.playwright_ws_url)
             else:
-                browser = await p.chromium.launch(headless=self.headless, proxy=self.proxy)
+                browser = await p.chromium.launch(
+                    headless=self.headless, proxy=self.proxy
+                )
 
             for url in self.urls:
                 try:
@@ -582,7 +586,8 @@ class SafeWebBaseLoader(WebBaseLoader):
                         raise
                     else:
                         log.warning(
-                            f"Error fetching {url} with attempt {i + 1}/{retries}: {e}. Retrying..."
+                            f"Error fetching {url} with attempt "
+                            f"{i + 1}/{retries}: {e}. Retrying..."
                         )
                         await asyncio.sleep(cooldown * backoff**i)
         raise ValueError("retry count exceeded")
@@ -605,7 +610,9 @@ class SafeWebBaseLoader(WebBaseLoader):
             final_results.append(BeautifulSoup(result, parser, **self.bs_kwargs))
         return final_results
 
-    async def ascrape_all(self, urls: List[str], parser: Union[str, None] = None) -> List[Any]:
+    async def ascrape_all(
+        self, urls: List[str], parser: Union[str, None] = None
+    ) -> List[Any]:
         """Async fetch all urls, then return soups for all results."""
         results = await self.fetch_all(urls)
         return self._unpack_fetch_results(results, urls, parser=parser)
@@ -634,7 +641,9 @@ class SafeWebBaseLoader(WebBaseLoader):
             if title := soup.find("title"):
                 metadata["title"] = title.get_text()
             if description := soup.find("meta", attrs={"name": "description"}):
-                metadata["description"] = description.get("content", "No description found.")
+                metadata["description"] = description.get(
+                    "content", "No description found."
+                )
             if html := soup.find("html"):
                 metadata["language"] = html.get("lang", "No language found.")
             yield Document(page_content=text, metadata=metadata)

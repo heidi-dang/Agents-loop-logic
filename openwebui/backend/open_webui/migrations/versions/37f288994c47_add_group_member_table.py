@@ -53,7 +53,9 @@ def upgrade() -> None:
         sa.Column("user_ids", sa.JSON()),  # JSON stored as text in SQLite + PG
     )
 
-    results = connection.execute(sa.select(group_table.c.id, group_table.c.user_ids)).fetchall()
+    results = connection.execute(
+        sa.select(group_table.c.id, group_table.c.user_ids)
+    ).fetchall()
 
     print(results)
 
@@ -134,7 +136,9 @@ def downgrade():
         member_ids = [m[0] for m in members]
 
         connection.execute(
-            group_table.update().where(group_table.c.id == group_id).values(user_ids=member_ids)
+            group_table.update()
+            .where(group_table.c.id == group_id)
+            .values(user_ids=member_ids)
         )
 
     # Drop the new table

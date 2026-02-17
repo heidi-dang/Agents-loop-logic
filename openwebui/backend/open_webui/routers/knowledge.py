@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import StreamingResponse
@@ -17,7 +17,7 @@ from open_webui.models.knowledge import (
     KnowledgeResponse,
     KnowledgeUserResponse,
 )
-from open_webui.models.files import Files, FileMetadataResponse
+from open_webui.models.files import Files, FileModel, FileMetadataResponse
 from open_webui.retrieval.vector.factory import VECTOR_DB_CLIENT
 from open_webui.routers.retrieval import (
     process_file,
@@ -25,6 +25,7 @@ from open_webui.routers.retrieval import (
     process_files_batch,
     BatchProcessFilesForm,
 )
+from open_webui.storage.provider import Storage
 
 from open_webui.constants import ERROR_MESSAGES
 from open_webui.utils.auth import get_verified_user, get_admin_user
@@ -233,7 +234,9 @@ async def search_knowledge_files(
 
     filter["user_id"] = user.id
 
-    return Knowledges.search_knowledge_files(filter=filter, skip=skip, limit=limit, db=db)
+    return Knowledges.search_knowledge_files(
+        filter=filter, skip=skip, limit=limit, db=db
+    )
 
 
 ############################
@@ -315,7 +318,9 @@ async def reindex_knowledge_files(
             files = Knowledges.get_files_by_id(knowledge_base.id, db=db)
             try:
                 if VECTOR_DB_CLIENT.has_collection(collection_name=knowledge_base.id):
-                    VECTOR_DB_CLIENT.delete_collection(collection_name=knowledge_base.id)
+                    VECTOR_DB_CLIENT.delete_collection(
+                        collection_name=knowledge_base.id
+                    )
             except Exception as e:
                 log.error(f"Error deleting collection {knowledge_base.id}: {str(e)}")
                 continue  # Skip, don't raise
@@ -326,12 +331,16 @@ async def reindex_knowledge_files(
                     await run_in_threadpool(
                         process_file,
                         request,
-                        ProcessFileForm(file_id=file.id, collection_name=knowledge_base.id),
+                        ProcessFileForm(
+                            file_id=file.id, collection_name=knowledge_base.id
+                        ),
                         user=user,
                         db=db,
                     )
                 except Exception as e:
-                    log.error(f"Error processing file {file.filename} (ID: {file.id}): {str(e)}")
+                    log.error(
+                        f"Error processing file {file.filename} (ID: {file.id}): {str(e)}"
+                    )
                     failed_files.append({"file_id": file.id, "error": str(e)})
                     continue
 
@@ -347,7 +356,7 @@ async def reindex_knowledge_files(
             for failed in failed_files:
                 log.warning(f"File ID: {failed['file_id']}, Error: {failed['error']}")
 
-    log.info("Reindexing completed.")
+    log.info(f"Reindexing completed.")
     return True
 
 
@@ -408,6 +417,7 @@ async def get_knowledge_by_id(
                 db=db,
             )
         ):
+
             return KnowledgeFilesResponse(
                 **knowledge.model_dump(),
                 write_access=(
@@ -557,7 +567,10 @@ async def update_knowledge_access_by_id(
         form_data.access_grants = [
             grant
             for grant in form_data.access_grants
-            if not (grant.get("principal_type") == "user" and grant.get("principal_id") == "*")
+            if not (
+                grant.get("principal_type") == "user"
+                and grant.get("principal_id") == "*"
+            )
         ]
 
     AccessGrants.set_access_grants("knowledge", id, form_data.access_grants, db=db)
@@ -623,7 +636,9 @@ async def get_knowledge_files_by_id(
     if direction:
         filter["direction"] = direction
 
-    return Knowledges.search_files_by_id(id, user.id, filter=filter, skip=skip, limit=limit, db=db)
+    return Knowledges.search_files_by_id(
+        id, user.id, filter=filter, skip=skip, limit=limit, db=db
+    )
 
 
 ############################
@@ -736,6 +751,7 @@ def update_file_from_knowledge_by_id(
         )
         and user.role != "admin"
     ):
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
@@ -749,7 +765,9 @@ def update_file_from_knowledge_by_id(
         )
 
     # Remove content from the vector database
-    VECTOR_DB_CLIENT.delete(collection_name=knowledge.id, filter={"file_id": form_data.file_id})
+    VECTOR_DB_CLIENT.delete(
+        collection_name=knowledge.id, filter={"file_id": form_data.file_id}
+    )
 
     # Add content to the vector database
     try:
@@ -820,7 +838,9 @@ def remove_file_from_knowledge_by_id(
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
 
-    Knowledges.remove_file_from_knowledge_by_id(knowledge_id=id, file_id=form_data.file_id, db=db)
+    Knowledges.remove_file_from_knowledge_by_id(
+        knowledge_id=id, file_id=form_data.file_id, db=db
+    )
 
     # Remove content from the vector database
     try:
@@ -1041,7 +1061,9 @@ async def add_files_to_knowledge_batch(
             db=db,
         )
     except Exception as e:
-        log.error(f"add_files_to_knowledge_batch: Exception occurred: {e}", exc_info=True)
+        log.error(
+            f"add_files_to_knowledge_batch: Exception occurred: {e}", exc_info=True
+        )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
     # Only add files that were successfully processed

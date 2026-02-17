@@ -31,6 +31,8 @@ def search_mojeek(
         results = get_filtered_results(results, filter_list)
 
     return [
-        SearchResult(link=result["url"], title=result.get("title"), snippet=result.get("desc"))
+        SearchResult(
+            link=result["url"], title=result.get("title"), snippet=result.get("desc")
+        )
         for result in results
     ]

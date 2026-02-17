@@ -3,7 +3,7 @@ import time
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from open_webui.internal.db import Base, get_db_context
+from open_webui.internal.db import Base, get_db, get_db_context
 from open_webui.models.users import Users, UserResponse
 from open_webui.models.groups import Groups
 from open_webui.models.access_grants import AccessGrantModel, AccessGrants
@@ -111,7 +111,9 @@ class SkillsTable:
         return AccessGrants.get_grants_by_resource("skill", skill_id, db=db)
 
     def _to_skill_model(self, skill: Skill, db: Optional[Session] = None) -> SkillModel:
-        skill_data = SkillModel.model_validate(skill).model_dump(exclude={"access_grants"})
+        skill_data = SkillModel.model_validate(skill).model_dump(
+            exclude={"access_grants"}
+        )
         skill_data["access_grants"] = self._get_access_grants(skill_data["id"], db=db)
         return SkillModel.model_validate(skill_data)
 
@@ -134,7 +136,9 @@ class SkillsTable:
                 db.add(result)
                 db.commit()
                 db.refresh(result)
-                AccessGrants.set_access_grants("skill", result.id, form_data.access_grants, db=db)
+                AccessGrants.set_access_grants(
+                    "skill", result.id, form_data.access_grants, db=db
+                )
                 if result:
                     return self._to_skill_model(result, db=db)
                 else:
@@ -143,7 +147,9 @@ class SkillsTable:
                 log.exception(f"Error creating a new skill: {e}")
                 return None
 
-    def get_skill_by_id(self, id: str, db: Optional[Session] = None) -> Optional[SkillModel]:
+    def get_skill_by_id(
+        self, id: str, db: Optional[Session] = None
+    ) -> Optional[SkillModel]:
         try:
             with get_db_context(db) as db:
                 skill = db.get(Skill, id)
@@ -151,7 +157,9 @@ class SkillsTable:
         except Exception:
             return None
 
-    def get_skill_by_name(self, name: str, db: Optional[Session] = None) -> Optional[SkillModel]:
+    def get_skill_by_name(
+        self, name: str, db: Optional[Session] = None
+    ) -> Optional[SkillModel]:
         try:
             with get_db_context(db) as db:
                 skill = db.query(Skill).filter_by(name=name).first()
@@ -185,7 +193,9 @@ class SkillsTable:
         self, user_id: str, permission: str = "write", db: Optional[Session] = None
     ) -> list[SkillUserModel]:
         skills = self.get_skills(db=db)
-        user_group_ids = {group.id for group in Groups.get_groups_by_member_id(user_id, db=db)}
+        user_group_ids = {
+            group.id for group in Groups.get_groups_by_member_id(user_id, db=db)
+        }
 
         return [
             skill
@@ -263,7 +273,9 @@ class SkillsTable:
                         SkillUserResponse(
                             **self._to_skill_model(skill, db=db).model_dump(),
                             user=(
-                                UserResponse(**UserModel.model_validate(user).model_dump())
+                                UserResponse(
+                                    **UserModel.model_validate(user).model_dump()
+                                )
                                 if user
                                 else None
                             ),
@@ -281,7 +293,9 @@ class SkillsTable:
         try:
             with get_db_context(db) as db:
                 access_grants = updated.pop("access_grants", None)
-                db.query(Skill).filter_by(id=id).update({**updated, "updated_at": int(time.time())})
+                db.query(Skill).filter_by(id=id).update(
+                    {**updated, "updated_at": int(time.time())}
+                )
                 db.commit()
                 if access_grants is not None:
                     AccessGrants.set_access_grants("skill", id, access_grants, db=db)
@@ -292,7 +306,9 @@ class SkillsTable:
         except Exception:
             return None
 
-    def toggle_skill_by_id(self, id: str, db: Optional[Session] = None) -> Optional[SkillModel]:
+    def toggle_skill_by_id(
+        self, id: str, db: Optional[Session] = None
+    ) -> Optional[SkillModel]:
         with get_db_context(db) as db:
             try:
                 skill = db.query(Skill).filter_by(id=id).first()

@@ -69,7 +69,9 @@ class S3VectorClient(VectorDBBase):
             log.error(f"Error creating S3 index '{index_name}': {e}")
             raise
 
-    def _filter_metadata(self, metadata: Dict[str, Any], item_id: str) -> Dict[str, Any]:
+    def _filter_metadata(
+        self, metadata: Dict[str, Any], item_id: str
+    ) -> Dict[str, Any]:
         """
         Filter vector metadata keys to comply with S3 Vector API limit of 10 keys maximum.
         """
@@ -106,7 +108,9 @@ class S3VectorClient(VectorDBBase):
                     if len(filtered_metadata) >= 10:
                         break
 
-        log.warning(f"Metadata for key '{item_id}' had {len(metadata)} keys, limited to 10 keys")
+        log.warning(
+            f"Metadata for key '{item_id}' had {len(metadata)} keys, limited to 10 keys"
+        )
         return filtered_metadata
 
     def has_collection(self, collection_name: str) -> bool:
@@ -115,7 +119,9 @@ class S3VectorClient(VectorDBBase):
         This avoids pagination issues with list_indexes() and is significantly faster.
         """
         try:
-            self.client.get_index(vectorBucketName=self.bucket_name, indexName=collection_name)
+            self.client.get_index(
+                vectorBucketName=self.bucket_name, indexName=collection_name
+            )
             return True
         except Exception as e:
             log.error(f"Error checking if index '{collection_name}' exists: {e}")
@@ -127,12 +133,16 @@ class S3VectorClient(VectorDBBase):
         """
 
         if not self.has_collection(collection_name):
-            log.warning(f"Collection '{collection_name}' does not exist, nothing to delete")
+            log.warning(
+                f"Collection '{collection_name}' does not exist, nothing to delete"
+            )
             return
 
         try:
             log.info(f"Deleting collection '{collection_name}'")
-            self.client.delete_index(vectorBucketName=self.bucket_name, indexName=collection_name)
+            self.client.delete_index(
+                vectorBucketName=self.bucket_name, indexName=collection_name
+            )
             log.info(f"Successfully deleted collection '{collection_name}'")
         except Exception as e:
             log.error(f"Error deleting collection '{collection_name}': {e}")
@@ -197,7 +207,7 @@ class S3VectorClient(VectorDBBase):
                     vectors=batch,
                 )
                 log.info(
-                    f"Inserted batch {i // batch_size + 1}: {len(batch)} vectors into index '{collection_name}'."
+                    f"Inserted batch {i//batch_size + 1}: {len(batch)} vectors into index '{collection_name}'."
                 )
 
             log.info(
@@ -220,7 +230,9 @@ class S3VectorClient(VectorDBBase):
 
         try:
             if not self.has_collection(collection_name):
-                log.info(f"Index '{collection_name}' does not exist. Creating index for upsert.")
+                log.info(
+                    f"Index '{collection_name}' does not exist. Creating index for upsert."
+                )
                 self._create_index(
                     index_name=collection_name,
                     dimension=dimension,
@@ -265,7 +277,9 @@ class S3VectorClient(VectorDBBase):
                         f"Upserting batch 1: {len(batch)} vectors. First vector sample: key={batch[0]['key']}, data_type={type(batch[0]['data']['float32'])}, data_len={len(batch[0]['data']['float32'])}"
                     )
                 else:
-                    log.info(f"Upserting batch {i // batch_size + 1}: {len(batch)} vectors.")
+                    log.info(
+                        f"Upserting batch {i//batch_size + 1}: {len(batch)} vectors."
+                    )
 
                 self.client.put_vectors(
                     vectorBucketName=self.bucket_name,
@@ -273,7 +287,9 @@ class S3VectorClient(VectorDBBase):
                     vectors=batch,
                 )
 
-            log.info(f"Completed upsert of {len(vectors)} vectors into index '{collection_name}'.")
+            log.info(
+                f"Completed upsert of {len(vectors)} vectors into index '{collection_name}'."
+            )
         except Exception as e:
             log.error(f"Error upserting vectors: {e}")
             raise
@@ -310,7 +326,7 @@ class S3VectorClient(VectorDBBase):
 
             # Process each query vector
             for i, query_vector in enumerate(vectors):
-                log.debug(f"Processing query vector {i + 1}/{len(vectors)}")
+                log.debug(f"Processing query vector {i+1}/{len(vectors)}")
 
                 # Prepare the query vector in S3 Vector format
                 query_vector_dict = {"float32": [float(x) for x in query_vector]}
@@ -383,7 +399,7 @@ class S3VectorClient(VectorDBBase):
                     log.warning(f"Collection '{collection_name}' not found")
                     return None
                 elif error_code == "ValidationException":
-                    log.error("Invalid query vector dimensions or parameters")
+                    log.error(f"Invalid query vector dimensions or parameters")
                     return None
                 elif error_code == "AccessDeniedException":
                     log.error(
@@ -423,8 +439,12 @@ class S3VectorClient(VectorDBBase):
 
             # Extract the lists from the result
             all_ids = all_vectors_result.ids[0] if all_vectors_result.ids else []
-            all_documents = all_vectors_result.documents[0] if all_vectors_result.documents else []
-            all_metadatas = all_vectors_result.metadatas[0] if all_vectors_result.metadatas else []
+            all_documents = (
+                all_vectors_result.documents[0] if all_vectors_result.documents else []
+            )
+            all_metadatas = (
+                all_vectors_result.metadatas[0] if all_vectors_result.metadatas else []
+            )
 
             # Apply client-side filtering
             filtered_ids = []
@@ -517,7 +537,7 @@ class S3VectorClient(VectorDBBase):
                     vector_metadata = vector.get("metadata", {})
 
                     # Extract the actual vector array
-                    vector_data.get("float32", [])
+                    vector_array = vector_data.get("float32", [])
 
                     # For documents, we try to extract text from metadata or use the vector ID
                     document_text = ""
@@ -548,7 +568,9 @@ class S3VectorClient(VectorDBBase):
                 if not next_token:
                     break
 
-            log.info(f"Retrieved {len(all_ids)} vectors from collection '{collection_name}'")
+            log.info(
+                f"Retrieved {len(all_ids)} vectors from collection '{collection_name}'"
+            )
 
             # Return in GetResult format
             # The Open WebUI GetResult expects lists of lists, so we wrap each list
@@ -560,7 +582,9 @@ class S3VectorClient(VectorDBBase):
                 return GetResult(ids=[[]], documents=[[]], metadatas=[[]])
 
         except Exception as e:
-            log.error(f"Error retrieving vectors from collection '{collection_name}': {str(e)}")
+            log.error(
+                f"Error retrieving vectors from collection '{collection_name}': {str(e)}"
+            )
             # Handle specific AWS exceptions
             if hasattr(e, "response") and "Error" in e.response:
                 error_code = e.response["Error"]["Code"]
@@ -585,7 +609,9 @@ class S3VectorClient(VectorDBBase):
         """
 
         if not self.has_collection(collection_name):
-            log.warning(f"Collection '{collection_name}' does not exist, nothing to delete")
+            log.warning(
+                f"Collection '{collection_name}' does not exist, nothing to delete"
+            )
             return
 
         # Check if this is a knowledge collection (not file-specific)
@@ -594,7 +620,9 @@ class S3VectorClient(VectorDBBase):
         try:
             if ids:
                 # Delete by specific vector IDs/keys
-                log.info(f"Deleting {len(ids)} vectors by IDs from collection '{collection_name}'")
+                log.info(
+                    f"Deleting {len(ids)} vectors by IDs from collection '{collection_name}'"
+                )
                 self.client.delete_vectors(
                     vectorBucketName=self.bucket_name,
                     indexName=collection_name,
@@ -624,7 +652,9 @@ class S3VectorClient(VectorDBBase):
                 query_result = self.query(collection_name, filter)
                 if query_result and query_result.ids and query_result.ids[0]:
                     matching_ids = query_result.ids[0]
-                    log.info(f"Found {len(matching_ids)} vectors matching filter, deleting them")
+                    log.info(
+                        f"Found {len(matching_ids)} vectors matching filter, deleting them"
+                    )
 
                     # Delete the matching vectors by ID
                     self.client.delete_vectors(
@@ -640,7 +670,9 @@ class S3VectorClient(VectorDBBase):
             else:
                 log.warning("No IDs or filter provided for deletion")
         except Exception as e:
-            log.error(f"Error deleting vectors from collection '{collection_name}': {e}")
+            log.error(
+                f"Error deleting vectors from collection '{collection_name}': {e}"
+            )
             raise
 
     def reset(self) -> None:
@@ -649,7 +681,9 @@ class S3VectorClient(VectorDBBase):
         """
 
         try:
-            log.warning("Reset called - this will delete all vector indexes in the S3 bucket")
+            log.warning(
+                "Reset called - this will delete all vector indexes in the S3 bucket"
+            )
 
             # List all indexes
             response = self.client.list_indexes(vectorBucketName=self.bucket_name)
@@ -724,7 +758,10 @@ class S3VectorClient(VectorDBBase):
                         if actual_value == op_value:
                             return False
                     elif op == "$in":
-                        if not isinstance(op_value, list) or actual_value not in op_value:
+                        if (
+                            not isinstance(op_value, list)
+                            or actual_value not in op_value
+                        ):
                             return False
                     elif op == "$nin":
                         if isinstance(op_value, list) and actual_value in op_value:

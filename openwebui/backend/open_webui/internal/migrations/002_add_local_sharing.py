@@ -30,13 +30,15 @@ import peewee as pw
 from peewee_migrate import Migrator
 
 with suppress(ImportError):
-    pass
+    import playhouse.postgres_ext as pw_pext
 
 
 def migrate(migrator: Migrator, database: pw.Database, *, fake=False):
     """Write your migrations here."""
 
-    migrator.add_fields("chat", share_id=pw.CharField(max_length=255, null=True, unique=True))
+    migrator.add_fields(
+        "chat", share_id=pw.CharField(max_length=255, null=True, unique=True)
+    )
 
 
 def rollback(migrator: Migrator, database: pw.Database, *, fake=False):

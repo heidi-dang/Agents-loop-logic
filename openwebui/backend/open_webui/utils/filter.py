@@ -2,6 +2,7 @@ import inspect
 import logging
 
 from open_webui.utils.plugin import (
+    load_function_module_by_id,
     get_function_module_from_cache,
 )
 from open_webui.models.functions import Functions
@@ -13,7 +14,9 @@ def get_function_module(request, function_id, load_from_db=True):
     """
     Get the function module by its ID.
     """
-    function_module, _, _ = get_function_module_from_cache(request, function_id, load_from_db)
+    function_module, _, _ = get_function_module_from_cache(
+        request, function_id, load_from_db
+    )
     return function_module
 
 
@@ -30,7 +33,8 @@ def get_sorted_filter_ids(request, model: dict, enabled_filter_ids: list = None)
         filter_ids.extend(model["info"]["meta"].get("filterIds", []))
         filter_ids = list(set(filter_ids))
     active_filter_ids = [
-        function.id for function in Functions.get_functions_by_type("filter", active_only=True)
+        function.id
+        for function in Functions.get_functions_by_type("filter", active_only=True)
     ]
 
     def get_active_status(filter_id):
@@ -51,7 +55,9 @@ def get_sorted_filter_ids(request, model: dict, enabled_filter_ids: list = None)
     return filter_ids
 
 
-async def process_filter_functions(request, filter_functions, filter_type, form_data, extra_params):
+async def process_filter_functions(
+    request, filter_functions, filter_type, form_data, extra_params
+):
     skip_files = None
 
     for function in filter_functions:
@@ -75,7 +81,9 @@ async def process_filter_functions(request, filter_functions, filter_type, form_
         # Apply valves to the function
         if hasattr(function_module, "valves") and hasattr(function_module, "Valves"):
             valves = Functions.get_function_valves_by_id(filter_id)
-            function_module.valves = function_module.Valves(**(valves if valves else {}))
+            function_module.valves = function_module.Valves(
+                **(valves if valves else {})
+            )
 
         try:
             # Prepare parameters

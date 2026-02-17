@@ -1,5 +1,6 @@
 from fastapi import (
     Depends,
+    FastAPI,
     File,
     Form,
     HTTPException,
@@ -13,10 +14,12 @@ import os
 import logging
 import shutil
 from pydantic import BaseModel
+from starlette.responses import FileResponse
 from typing import Optional
 
 from open_webui.env import AIOHTTP_CLIENT_SESSION_SSL
 from open_webui.config import CACHE_DIR
+from open_webui.constants import ERROR_MESSAGES
 
 
 from open_webui.routers.openai import get_all_models_responses
@@ -43,7 +46,8 @@ def get_sorted_filters(model_id, models):
         and (
             model["pipeline"]["pipelines"] == ["*"]
             or any(
-                model_id == target_model_id for target_model_id in model["pipeline"]["pipelines"]
+                model_id == target_model_id
+                for target_model_id in model["pipeline"]["pipelines"]
             )
         )
     ]
@@ -90,8 +94,12 @@ async def process_pipeline_inlet_filter(request, payload, user, models):
                 ) as response:
                     payload = await response.json()
                     response.raise_for_status()
-            except aiohttp.ClientResponseError:
-                res = await response.json() if response.content_type == "application/json" else {}
+            except aiohttp.ClientResponseError as e:
+                res = (
+                    await response.json()
+                    if response.content_type == "application/json"
+                    else {}
+                )
                 if "detail" in res:
                     raise Exception(response.status, res["detail"])
             except Exception as e:
@@ -139,10 +147,12 @@ async def process_pipeline_outlet_filter(request, payload, user, models):
                 ) as response:
                     payload = await response.json()
                     response.raise_for_status()
-            except aiohttp.ClientResponseError:
+            except aiohttp.ClientResponseError as e:
                 try:
                     res = (
-                        await response.json() if "application/json" in response.content_type else {}
+                        await response.json()
+                        if "application/json" in response.content_type
+                        else {}
                     )
                     if "detail" in res:
                         raise Exception(response.status, res)
@@ -267,7 +277,9 @@ class AddPipelineForm(BaseModel):
 
 
 @router.post("/add")
-async def add_pipeline(request: Request, form_data: AddPipelineForm, user=Depends(get_admin_user)):
+async def add_pipeline(
+    request: Request, form_data: AddPipelineForm, user=Depends(get_admin_user)
+):
     response = None
     try:
         urlIdx = form_data.urlIdx
@@ -300,7 +312,9 @@ async def add_pipeline(request: Request, form_data: AddPipelineForm, user=Depend
                 pass
 
         raise HTTPException(
-            status_code=(response.status if response is not None else status.HTTP_404_NOT_FOUND),
+            status_code=(
+                response.status if response is not None else status.HTTP_404_NOT_FOUND
+            ),
             detail=detail if detail else "Pipeline not found",
         )
 
@@ -346,7 +360,9 @@ async def delete_pipeline(
                 pass
 
         raise HTTPException(
-            status_code=(response.status if response is not None else status.HTTP_404_NOT_FOUND),
+            status_code=(
+                response.status if response is not None else status.HTTP_404_NOT_FOUND
+            ),
             detail=detail if detail else "Pipeline not found",
         )
 
@@ -384,7 +400,9 @@ async def get_pipelines(
                 pass
 
         raise HTTPException(
-            status_code=(response.status if response is not None else status.HTTP_404_NOT_FOUND),
+            status_code=(
+                response.status if response is not None else status.HTTP_404_NOT_FOUND
+            ),
             detail=detail if detail else "Pipeline not found",
         )
 
@@ -425,7 +443,9 @@ async def get_pipeline_valves(
                 pass
 
         raise HTTPException(
-            status_code=(response.status if response is not None else status.HTTP_404_NOT_FOUND),
+            status_code=(
+                response.status if response is not None else status.HTTP_404_NOT_FOUND
+            ),
             detail=detail if detail else "Pipeline not found",
         )
 
@@ -466,7 +486,9 @@ async def get_pipeline_valves_spec(
                 pass
 
         raise HTTPException(
-            status_code=(response.status if response is not None else status.HTTP_404_NOT_FOUND),
+            status_code=(
+                response.status if response is not None else status.HTTP_404_NOT_FOUND
+            ),
             detail=detail if detail else "Pipeline not found",
         )
 
@@ -510,6 +532,8 @@ async def update_pipeline_valves(
                 pass
 
         raise HTTPException(
-            status_code=(response.status if response is not None else status.HTTP_404_NOT_FOUND),
+            status_code=(
+                response.status if response is not None else status.HTTP_404_NOT_FOUND
+            ),
             detail=detail if detail else "Pipeline not found",
         )

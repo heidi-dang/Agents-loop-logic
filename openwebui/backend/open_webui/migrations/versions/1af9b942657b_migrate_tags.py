@@ -8,9 +8,10 @@ Create Date: 2024-10-09 21:02:35.241684
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.sql import table, column
+from sqlalchemy.sql import table, select, update, column
 from sqlalchemy.engine.reflection import Inspector
 
+import json
 
 revision = "1af9b942657b"
 down_revision = "242a2047eae0"
@@ -39,7 +40,10 @@ def upgrade():
 
         with op.batch_alter_table("tag", schema=None) as batch_op:
             # Check if the unique constraint already exists
-            if not any(constraint["name"] == "uq_id_user_id" for constraint in current_constraints):
+            if not any(
+                constraint["name"] == "uq_id_user_id"
+                for constraint in current_constraints
+            ):
                 # Create unique constraint if it doesn't exist
                 batch_op.create_unique_constraint("uq_id_user_id", ["id", "user_id"])
 
@@ -95,9 +99,13 @@ def upgrade():
 
     # Add columns `pinned` and `meta` to 'chat'
     op.add_column("chat", sa.Column("pinned", sa.Boolean(), nullable=True))
-    op.add_column("chat", sa.Column("meta", sa.JSON(), nullable=False, server_default="{}"))
+    op.add_column(
+        "chat", sa.Column("meta", sa.JSON(), nullable=False, server_default="{}")
+    )
 
-    chatidtag = table("chatidtag", column("chat_id", sa.String()), column("tag_name", sa.String()))
+    chatidtag = table(
+        "chatidtag", column("chat_id", sa.String()), column("tag_name", sa.String())
+    )
     chat = table(
         "chat",
         column("id", sa.String()),

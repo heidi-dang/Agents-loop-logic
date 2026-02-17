@@ -7,11 +7,19 @@ import asyncio
 from pydantic import BaseModel
 from typing import AsyncGenerator, Generator, Iterator
 from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
     Request,
+    UploadFile,
+    status,
 )
-from starlette.responses import StreamingResponse
+from starlette.responses import Response, StreamingResponse
 
 
+from open_webui.constants import ERROR_MESSAGES
 from open_webui.socket.main import (
     get_event_call,
     get_event_emitter,
@@ -23,6 +31,7 @@ from open_webui.models.functions import Functions
 from open_webui.models.models import Models
 
 from open_webui.utils.plugin import (
+    load_function_module_by_id,
     get_function_module_from_cache,
 )
 from open_webui.utils.tools import get_tools
@@ -30,6 +39,9 @@ from open_webui.utils.tools import get_tools
 from open_webui.env import GLOBAL_LOG_LEVEL
 
 from open_webui.utils.misc import (
+    add_or_update_system_message,
+    get_last_user_message,
+    prepend_to_first_user_message_content,
     openai_chat_chunk_message_template,
     openai_chat_completion_message_template,
 )
@@ -92,10 +104,12 @@ async def get_function_models(request):
                     log.exception(e)
                     sub_pipes = []
 
-                log.debug(f"get_function_models: function '{pipe.id}' is a manifold of {sub_pipes}")
+                log.debug(
+                    f"get_function_models: function '{pipe.id}' is a manifold of {sub_pipes}"
+                )
 
                 for p in sub_pipes:
-                    sub_pipe_id = f"{pipe.id}.{p['id']}"
+                    sub_pipe_id = f'{pipe.id}.{p["id"]}'
                     sub_pipe_name = p["name"]
 
                     if hasattr(function_module, "name"):
@@ -139,7 +153,9 @@ async def get_function_models(request):
     return pipe_models
 
 
-async def generate_function_chat_completion(request, form_data, user, models: dict = {}):
+async def generate_function_chat_completion(
+    request, form_data, user, models: dict = {}
+):
     async def execute_pipe(pipe, params):
         if inspect.iscoroutinefunction(pipe):
             return await pipe(**params)
@@ -293,7 +309,7 @@ async def generate_function_chat_completion(request, form_data, user, models: di
 
             except Exception as e:
                 log.error(f"Error: {e}")
-                yield f"data: {json.dumps({'error': {'detail': str(e)}})}\n\n"
+                yield f"data: {json.dumps({'error': {'detail':str(e)}})}\n\n"
                 return
 
             if isinstance(res, str):
@@ -309,7 +325,9 @@ async def generate_function_chat_completion(request, form_data, user, models: di
                     yield process_line(form_data, line)
 
             if isinstance(res, str) or isinstance(res, Generator):
-                finish_message = openai_chat_chunk_message_template(form_data["model"], "")
+                finish_message = openai_chat_chunk_message_template(
+                    form_data["model"], ""
+                )
                 finish_message["choices"][0]["finish_reason"] = "stop"
                 yield f"data: {json.dumps(finish_message)}\n\n"
                 yield "data: [DONE]"

@@ -6,7 +6,7 @@ import uuid
 import logging
 from datetime import timedelta
 from pathlib import Path
-from typing import Optional, Sequence, Union
+from typing import Callable, Optional, Sequence, Union
 import json
 import aiohttp
 import mimeparse
@@ -93,7 +93,9 @@ def get_message_list(messages_map, message_id):
     message_list = []
 
     while current_message:
-        message_list.insert(0, current_message)  # Insert the message at the beginning of the list
+        message_list.insert(
+            0, current_message
+        )  # Insert the message at the beginning of the list
         parent_id = current_message.get("parentId")  # Use .get() for safety
         current_message = messages_map.get(parent_id) if parent_id else None
 
@@ -102,7 +104,10 @@ def get_message_list(messages_map, message_id):
 
 def get_messages_content(messages: list[dict]) -> str:
     return "\n".join(
-        [f"{message['role'].upper()}: {get_content_from_message(message)}" for message in messages]
+        [
+            f"{message['role'].upper()}: {get_content_from_message(message)}"
+            for message in messages
+        ]
     )
 
 
@@ -150,7 +155,9 @@ def convert_output_to_messages(output: list, raw: bool = False) -> list[dict]:
                 {
                     "role": "assistant",
                     "content": "\n".join(pending_content) if pending_content else "",
-                    **({"tool_calls": pending_tool_calls} if pending_tool_calls else {}),
+                    **(
+                        {"tool_calls": pending_tool_calls} if pending_tool_calls else {}
+                    ),
                 }
             )
             pending_content = []
@@ -229,7 +236,9 @@ def convert_output_to_messages(output: list, raw: bool = False) -> list[dict]:
             code_output = item.get("output", "")
 
             if code:
-                pending_content.append(f"<code_interpreter>\n{code}\n</code_interpreter>")
+                pending_content.append(
+                    f"<code_interpreter>\n{code}\n</code_interpreter>"
+                )
 
             if code_output:
                 if isinstance(code_output, dict):
@@ -313,7 +322,9 @@ def replace_system_message_content(content: str, messages: list[dict]) -> dict:
     return messages
 
 
-def add_or_update_system_message(content: str, messages: list[dict], append: bool = False):
+def add_or_update_system_message(
+    content: str, messages: list[dict], append: bool = False
+):
     """
     Adds a new system message at the beginning of the messages list
     or updates the existing system message at the beginning.
@@ -351,7 +362,9 @@ def add_or_update_user_message(content: str, messages: list[dict], append: bool 
     return messages
 
 
-def prepend_to_first_user_message_content(content: str, messages: list[dict]) -> list[dict]:
+def prepend_to_first_user_message_content(
+    content: str, messages: list[dict]
+) -> list[dict]:
     for message in messages:
         if message["role"] == "user":
             message = update_message_content(message, content, append=False)
@@ -503,7 +516,9 @@ def sanitize_text_for_db(text: str) -> str:
     # Remove invalid UTF-8 surrogate characters that can cause encoding errors
     # This handles cases where binary data or encoding issues introduced surrogates
     try:
-        text = text.encode("utf-8", errors="surrogatepass").decode("utf-8", errors="ignore")
+        text = text.encode("utf-8", errors="surrogatepass").decode(
+            "utf-8", errors="ignore"
+        )
     except (UnicodeEncodeError, UnicodeDecodeError):
         pass
     return text
@@ -602,12 +617,16 @@ def parse_ollama_modelfile(model_text):
     data = {"base_model_id": None, "params": {}}
 
     # Parse base model
-    base_model_match = re.search(r"^FROM\s+(\w+)", model_text, re.MULTILINE | re.IGNORECASE)
+    base_model_match = re.search(
+        r"^FROM\s+(\w+)", model_text, re.MULTILINE | re.IGNORECASE
+    )
     if base_model_match:
         data["base_model_id"] = base_model_match.group(1)
 
     # Parse template
-    template_match = re.search(r'TEMPLATE\s+"""(.+?)"""', model_text, re.DOTALL | re.IGNORECASE)
+    template_match = re.search(
+        r'TEMPLATE\s+"""(.+?)"""', model_text, re.DOTALL | re.IGNORECASE
+    )
     if template_match:
         data["params"] = {"template": template_match.group(1).strip()}
 
@@ -641,8 +660,12 @@ def parse_ollama_modelfile(model_text):
         data["params"]["adapter"] = adapter_match.group(1)
 
     # Parse system description
-    system_desc_match = re.search(r'SYSTEM\s+"""(.+?)"""', model_text, re.DOTALL | re.IGNORECASE)
-    system_desc_match_single = re.search(r"SYSTEM\s+([^\n]+)", model_text, re.IGNORECASE)
+    system_desc_match = re.search(
+        r'SYSTEM\s+"""(.+?)"""', model_text, re.DOTALL | re.IGNORECASE
+    )
+    system_desc_match_single = re.search(
+        r"SYSTEM\s+([^\n]+)", model_text, re.IGNORECASE
+    )
 
     if system_desc_match:
         data["params"]["system"] = system_desc_match.group(1).strip()
@@ -755,7 +778,9 @@ def strict_match_mime_type(supported: list[str] | str, header: str) -> Optional[
 
 def extract_urls(text: str) -> list[str]:
     # Regex pattern to match URLs
-    url_pattern = re.compile(r"(https?://[^\s]+)", re.IGNORECASE)  # Matches http and https URLs
+    url_pattern = re.compile(
+        r"(https?://[^\s]+)", re.IGNORECASE
+    )  # Matches http and https URLs
     return url_pattern.findall(text)
 
 
@@ -775,7 +800,9 @@ async def stream_wrapper(response, session, content_handler=None):
     This is more reliable than BackgroundTask which may not run if client disconnects.
     """
     try:
-        stream = content_handler(response.content) if content_handler else response.content
+        stream = (
+            content_handler(response.content) if content_handler else response.content
+        )
         async for chunk in stream:
             yield chunk
     finally:

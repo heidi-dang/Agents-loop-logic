@@ -1,6 +1,11 @@
 import logging
+import os
+import shutil
+import uuid
+from pathlib import Path
 from typing import Optional
 from pydantic import BaseModel
+import mimetypes
 
 
 from open_webui.models.folders import (
@@ -15,15 +20,17 @@ from open_webui.models.files import Files
 from open_webui.models.knowledge import Knowledges
 
 
+from open_webui.config import UPLOAD_DIR
 from open_webui.constants import ERROR_MESSAGES
 from open_webui.internal.db import get_session
 from sqlalchemy.orm import Session
 
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Request
+from fastapi.responses import FileResponse, StreamingResponse
 
 
-from open_webui.utils.auth import get_verified_user
+from open_webui.utils.auth import get_admin_user, get_verified_user
 from open_webui.utils.access_control import has_permission
 
 log = logging.getLogger(__name__)
@@ -76,8 +83,11 @@ async def get_folders(
             if "files" in folder.data:
                 valid_files = []
                 for file in folder.data["files"]:
+
                     if file.get("type") == "file":
-                        if Files.check_access_by_user_id(file.get("id"), user.id, "read", db=db):
+                        if Files.check_access_by_user_id(
+                            file.get("id"), user.id, "read", db=db
+                        ):
                             valid_files.append(file)
                     elif file.get("type") == "collection":
                         if Knowledges.check_access_by_user_id(
@@ -163,6 +173,7 @@ async def update_folder_name_by_id(
 ):
     folder = Folders.get_folder_by_id_and_user_id(id, user.id, db=db)
     if folder:
+
         if form_data.name is not None:
             # Check if folder with same name exists
             existing_folder = Folders.get_folder_by_parent_id_and_user_id_and_name(
@@ -175,7 +186,9 @@ async def update_folder_name_by_id(
                 )
 
         try:
-            folder = Folders.update_folder_by_id_and_user_id(id, user.id, form_data, db=db)
+            folder = Folders.update_folder_by_id_and_user_id(
+                id, user.id, form_data, db=db
+            )
             return folder
         except Exception as e:
             log.exception(e)
@@ -308,9 +321,13 @@ async def delete_folder_by_id(
 
                 for folder_id in folder_ids:
                     if delete_contents:
-                        Chats.delete_chats_by_user_id_and_folder_id(user.id, folder_id, db=db)
+                        Chats.delete_chats_by_user_id_and_folder_id(
+                            user.id, folder_id, db=db
+                        )
                     else:
-                        Chats.move_chats_by_user_id_and_folder_id(user.id, folder_id, None, db=db)
+                        Chats.move_chats_by_user_id_and_folder_id(
+                            user.id, folder_id, None, db=db
+                        )
 
                 return True
             except Exception as e:
@@ -322,7 +339,9 @@ async def delete_folder_by_id(
                 )
             finally:
                 # Get all subfolders
-                subfolders = Folders.get_folders_by_parent_id_and_user_id(folder.id, user.id, db=db)
+                subfolders = Folders.get_folders_by_parent_id_and_user_id(
+                    folder.id, user.id, db=db
+                )
                 folders.extend(subfolders)
 
     else:

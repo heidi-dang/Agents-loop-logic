@@ -58,9 +58,12 @@ def prompt_template(template: str, user: Optional[Any] = None) -> str:
                     age = (
                         today.year
                         - birth_date.year
-                        - ((today.month, today.day) < (birth_date.month, birth_date.day))
+                        - (
+                            (today.month, today.day)
+                            < (birth_date.month, birth_date.day)
+                        )
                     )
-                except Exception:
+                except Exception as e:
                     pass
 
             USER_VARIABLES = {
@@ -83,23 +86,37 @@ def prompt_template(template: str, user: Optional[Any] = None) -> str:
 
     template = template.replace("{{CURRENT_DATE}}", formatted_date)
     template = template.replace("{{CURRENT_TIME}}", formatted_time)
-    template = template.replace("{{CURRENT_DATETIME}}", f"{formatted_date} {formatted_time}")
+    template = template.replace(
+        "{{CURRENT_DATETIME}}", f"{formatted_date} {formatted_time}"
+    )
     template = template.replace("{{CURRENT_WEEKDAY}}", formatted_weekday)
 
     template = template.replace("{{USER_NAME}}", USER_VARIABLES.get("name", "Unknown"))
-    template = template.replace("{{USER_EMAIL}}", USER_VARIABLES.get("email", "Unknown"))
+    template = template.replace(
+        "{{USER_EMAIL}}", USER_VARIABLES.get("email", "Unknown")
+    )
     template = template.replace("{{USER_BIO}}", USER_VARIABLES.get("bio", "Unknown"))
-    template = template.replace("{{USER_GENDER}}", USER_VARIABLES.get("gender", "Unknown"))
-    template = template.replace("{{USER_BIRTH_DATE}}", USER_VARIABLES.get("birth_date", "Unknown"))
-    template = template.replace("{{USER_AGE}}", str(USER_VARIABLES.get("age", "Unknown")))
-    template = template.replace("{{USER_LOCATION}}", USER_VARIABLES.get("location", "Unknown"))
+    template = template.replace(
+        "{{USER_GENDER}}", USER_VARIABLES.get("gender", "Unknown")
+    )
+    template = template.replace(
+        "{{USER_BIRTH_DATE}}", USER_VARIABLES.get("birth_date", "Unknown")
+    )
+    template = template.replace(
+        "{{USER_AGE}}", str(USER_VARIABLES.get("age", "Unknown"))
+    )
+    template = template.replace(
+        "{{USER_LOCATION}}", USER_VARIABLES.get("location", "Unknown")
+    )
 
     return template
 
 
 def replace_prompt_variable(template: str, prompt: str) -> str:
     def replacement_function(match):
-        full_match = match.group(0).lower()  # Normalize to lowercase for consistent handling
+        full_match = match.group(
+            0
+        ).lower()  # Normalize to lowercase for consistent handling
         start_length = match.group(1)
         end_length = match.group(2)
         middle_length = match.group(3)
@@ -125,7 +142,9 @@ def replace_prompt_variable(template: str, prompt: str) -> str:
     return template
 
 
-def replace_messages_variable(template: str, messages: Optional[list[dict]] = None) -> str:
+def replace_messages_variable(
+    template: str, messages: Optional[list[dict]] = None
+) -> str:
     def replacement_function(match):
         full_match = match.group(0)
         start_length = match.group(1)
@@ -255,7 +274,9 @@ def image_prompt_generation_template(
     return template
 
 
-def emoji_generation_template(template: str, prompt: str, user: Optional[Any] = None) -> str:
+def emoji_generation_template(
+    template: str, prompt: str, user: Optional[Any] = None
+) -> str:
     template = replace_prompt_variable(template, prompt)
     template = prompt_template(template, user)
 
@@ -288,7 +309,9 @@ def query_generation_template(
     return template
 
 
-def moa_response_generation_template(template: str, prompt: str, responses: list[str]) -> str:
+def moa_response_generation_template(
+    template: str, prompt: str, responses: list[str]
+) -> str:
     def replacement_function(match):
         full_match = match.group(0)
         start_length = match.group(1)

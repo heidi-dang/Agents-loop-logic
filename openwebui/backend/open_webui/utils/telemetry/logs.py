@@ -1,3 +1,4 @@
+import logging
 from base64 import b64encode
 from opentelemetry.sdk._logs import (
     LoggingHandler,

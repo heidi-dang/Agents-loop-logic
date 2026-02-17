@@ -30,14 +30,18 @@ def search_sougou(
         client_profile = ClientProfile()
         client_profile.http_profile = http_profile
         params = json.dumps({"Query": query, "Cnt": 20})
-        common_client = CommonClient("tms", "2020-12-29", cred, "", profile=client_profile)
+        common_client = CommonClient(
+            "tms", "2020-12-29", cred, "", profile=client_profile
+        )
         results = [
             json.loads(page)
-            for page in common_client.call_json("SearchPro", json.loads(params))["Response"][
-                "Pages"
-            ]
+            for page in common_client.call_json("SearchPro", json.loads(params))[
+                "Response"
+            ]["Pages"]
         ]
-        sorted_results = sorted(results, key=lambda x: x.get("scour", 0.0), reverse=True)
+        sorted_results = sorted(
+            results, key=lambda x: x.get("scour", 0.0), reverse=True
+        )
         if filter_list:
             sorted_results = get_filtered_results(sorted_results, filter_list)
 

@@ -25,7 +25,9 @@ def upgrade():
         sa.Column("items", sa.JSON(), nullable=True),
         sa.Column("meta", sa.JSON(), nullable=True),
         sa.Column("is_expanded", sa.Boolean(), default=False, nullable=False),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False
+        ),
         sa.Column(
             "updated_at",
             sa.DateTime(),

@@ -3,7 +3,7 @@ import uuid
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from open_webui.internal.db import Base, get_db_context
+from open_webui.internal.db import Base, JSONField, get_db, get_db_context
 from open_webui.models.groups import Groups
 from open_webui.models.users import Users, UserResponse
 from open_webui.models.prompt_history import PromptHistories
@@ -77,6 +77,7 @@ class PromptAccessListResponse(BaseModel):
 
 
 class PromptForm(BaseModel):
+
     command: str
     name: str  # Changed from title
     content: str
@@ -95,8 +96,12 @@ class PromptsTable:
     ) -> list[AccessGrantModel]:
         return AccessGrants.get_grants_by_resource("prompt", prompt_id, db=db)
 
-    def _to_prompt_model(self, prompt: Prompt, db: Optional[Session] = None) -> PromptModel:
-        prompt_data = PromptModel.model_validate(prompt).model_dump(exclude={"access_grants"})
+    def _to_prompt_model(
+        self, prompt: Prompt, db: Optional[Session] = None
+    ) -> PromptModel:
+        prompt_data = PromptModel.model_validate(prompt).model_dump(
+            exclude={"access_grants"}
+        )
         prompt_data["access_grants"] = self._get_access_grants(prompt_data["id"], db=db)
         return PromptModel.model_validate(prompt_data)
 
@@ -127,7 +132,9 @@ class PromptsTable:
                 db.add(result)
                 db.commit()
                 db.refresh(result)
-                AccessGrants.set_access_grants("prompt", prompt_id, form_data.access_grants, db=db)
+                AccessGrants.set_access_grants(
+                    "prompt", prompt_id, form_data.access_grants, db=db
+                )
 
                 if result:
                     current_access_grants = self._get_access_grants(prompt_id, db=db)
@@ -138,7 +145,9 @@ class PromptsTable:
                         "data": form_data.data or {},
                         "meta": form_data.meta or {},
                         "tags": form_data.tags or [],
-                        "access_grants": [grant.model_dump() for grant in current_access_grants],
+                        "access_grants": [
+                            grant.model_dump() for grant in current_access_grants
+                        ],
                     }
 
                     history_entry = PromptHistories.create_history_entry(
@@ -190,7 +199,10 @@ class PromptsTable:
     def get_prompts(self, db: Optional[Session] = None) -> list[PromptUserResponse]:
         with get_db_context(db) as db:
             all_prompts = (
-                db.query(Prompt).filter(Prompt.is_active).order_by(Prompt.updated_at.desc()).all()
+                db.query(Prompt)
+                .filter(Prompt.is_active == True)
+                .order_by(Prompt.updated_at.desc())
+                .all()
             )
 
             user_ids = list(set(prompt.user_id for prompt in all_prompts))
@@ -216,7 +228,9 @@ class PromptsTable:
         self, user_id: str, permission: str = "write", db: Optional[Session] = None
     ) -> list[PromptUserResponse]:
         prompts = self.get_prompts(db=db)
-        user_group_ids = {group.id for group in Groups.get_groups_by_member_id(user_id, db=db)}
+        user_group_ids = {
+            group.id for group in Groups.get_groups_by_member_id(user_id, db=db)
+        }
 
         return [
             prompt
@@ -245,7 +259,7 @@ class PromptsTable:
 
             # Join with User table for user filtering and sorting
             query = db.query(Prompt, User).outerjoin(User, User.id == Prompt.user_id)
-            query = query.filter(Prompt.is_active)
+            query = query.filter(Prompt.is_active == True)
 
             if filter:
                 query_key = filter.get("query")
@@ -344,7 +358,9 @@ class PromptsTable:
                 if not prompt:
                     return None
 
-                latest_history = PromptHistories.get_latest_history_entry(prompt.id, db=db)
+                latest_history = PromptHistories.get_latest_history_entry(
+                    prompt.id, db=db
+                )
                 parent_id = latest_history.id if latest_history else None
                 current_access_grants = self._get_access_grants(prompt.id, db=db)
 
@@ -377,7 +393,9 @@ class PromptsTable:
                         "command": command,
                         "data": form_data.data or {},
                         "meta": form_data.meta or {},
-                        "access_grants": [grant.model_dump() for grant in current_access_grants],
+                        "access_grants": [
+                            grant.model_dump() for grant in current_access_grants
+                        ],
                     }
 
                     history_entry = PromptHistories.create_history_entry(
@@ -411,7 +429,9 @@ class PromptsTable:
                 if not prompt:
                     return None
 
-                latest_history = PromptHistories.get_latest_history_entry(prompt.id, db=db)
+                latest_history = PromptHistories.get_latest_history_entry(
+                    prompt.id, db=db
+                )
                 parent_id = latest_history.id if latest_history else None
                 current_access_grants = self._get_access_grants(prompt.id, db=db)
 
@@ -453,7 +473,9 @@ class PromptsTable:
                         "data": form_data.data or {},
                         "meta": form_data.meta or {},
                         "tags": prompt.tags or [],
-                        "access_grants": [grant.model_dump() for grant in current_access_grants],
+                        "access_grants": [
+                            grant.model_dump() for grant in current_access_grants
+                        ],
                     }
 
                     history_entry = PromptHistories.create_history_entry(
@@ -515,7 +537,9 @@ class PromptsTable:
                 if not prompt:
                     return None
 
-                history_entry = PromptHistories.get_history_entry_by_id(version_id, db=db)
+                history_entry = PromptHistories.get_history_entry_by_id(
+                    version_id, db=db
+                )
 
                 if not history_entry:
                     return None
@@ -538,7 +562,9 @@ class PromptsTable:
         except Exception:
             return None
 
-    def delete_prompt_by_command(self, command: str, db: Optional[Session] = None) -> bool:
+    def delete_prompt_by_command(
+        self, command: str, db: Optional[Session] = None
+    ) -> bool:
         """Soft delete a prompt by setting is_active to False."""
         try:
             with get_db_context(db) as db:
@@ -572,7 +598,9 @@ class PromptsTable:
         except Exception:
             return False
 
-    def hard_delete_prompt_by_command(self, command: str, db: Optional[Session] = None) -> bool:
+    def hard_delete_prompt_by_command(
+        self, command: str, db: Optional[Session] = None
+    ) -> bool:
         """Permanently delete a prompt and its history."""
         try:
             with get_db_context(db) as db:

@@ -1,8 +1,8 @@
 import logging
-from typing import Optional
+from typing import Optional, Literal
 import requests
 
-from open_webui.retrieval.web.main import SearchResult
+from open_webui.retrieval.web.main import SearchResult, get_filtered_results
 from open_webui.utils.headers import include_user_info_headers
 
 log = logging.getLogger(__name__)
@@ -62,7 +62,9 @@ def search_perplexity_search(
         results = json_response.get("results", [])
 
         return [
-            SearchResult(link=result["url"], title=result["title"], snippet=result["snippet"])
+            SearchResult(
+                link=result["url"], title=result["title"], snippet=result["snippet"]
+            )
             for result in results
         ]
 

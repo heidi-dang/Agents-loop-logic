@@ -4,6 +4,10 @@ from open_webui.routers.images import (
 )
 
 from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,
     UploadFile,
 )
 from typing import Optional
@@ -11,6 +15,7 @@ from pathlib import Path
 
 from open_webui.storage.provider import Storage
 
+from open_webui.models.chats import Chats
 from open_webui.models.files import Files
 from open_webui.routers.files import upload_file_handler
 from open_webui.retrieval.web.utils import validate_url
@@ -55,7 +60,7 @@ def get_image_base64_from_url(url: str) -> Optional[str]:
             else:
                 return None
 
-    except Exception:
+    except Exception as e:
         return None
 
 
@@ -98,7 +103,9 @@ def load_b64_audio_data(b64_str):
             b64_data = b64_str
             header = "data:audio/wav;base64"
         audio_data = base64.b64decode(b64_data)
-        content_type = header.split(";")[0].split(":")[1] if ";" in header else "audio/wav"
+        content_type = (
+            header.split(";")[0].split(":")[1] if ";" in header else "audio/wav"
+        )
         return audio_data, content_type
     except Exception as e:
         print(f"Error decoding base64 audio data: {e}")
@@ -169,5 +176,5 @@ def get_image_base64_from_file_id(id: str) -> Optional[str]:
                 return f"data:{content_type};base64,{encoded_string}"
         else:
             return None
-    except Exception:
+    except Exception as e:
         return None

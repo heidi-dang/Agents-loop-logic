@@ -113,7 +113,10 @@ class JupyterCodeExecuter:
         if self.password and not self.token:
             ws_headers = {
                 "Cookie": "; ".join(
-                    [f"{cookie.key}={cookie.value}" for cookie in self.session.cookie_jar]
+                    [
+                        f"{cookie.key}={cookie.value}"
+                        for cookie in self.session.cookie_jar
+                    ]
                 ),
                 **self.session.headers,
             }
@@ -123,7 +126,9 @@ class JupyterCodeExecuter:
         # initialize ws
         websocket_url, ws_headers = self.init_ws()
         # execute
-        async with websockets.connect(websocket_url, additional_headers=ws_headers) as ws:
+        async with websockets.connect(
+            websocket_url, additional_headers=ws_headers
+        ) as ws:
             await self.execute_in_jupyter(ws)
 
     async def execute_in_jupyter(self, ws) -> None:
@@ -195,6 +200,8 @@ class JupyterCodeExecuter:
 async def execute_code_jupyter(
     base_url: str, code: str, token: str = "", password: str = "", timeout: int = 60
 ) -> dict:
-    async with JupyterCodeExecuter(base_url, code, token, password, timeout) as executor:
+    async with JupyterCodeExecuter(
+        base_url, code, token, password, timeout
+    ) as executor:
         result = await executor.run()
         return result.model_dump()

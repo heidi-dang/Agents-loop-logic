@@ -4,11 +4,11 @@ import uuid
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from open_webui.internal.db import Base, get_db_context
+from open_webui.internal.db import Base, JSONField, get_db, get_db_context
 from open_webui.models.users import User
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import BigInteger, Column, Text, JSON
+from sqlalchemy import BigInteger, Column, Text, JSON, Boolean
 
 log = logging.getLogger(__name__)
 
@@ -167,7 +167,9 @@ class FeedbackTable:
                 log.exception(f"Error creating a new feedback: {e}")
                 return None
 
-    def get_feedback_by_id(self, id: str, db: Optional[Session] = None) -> Optional[FeedbackModel]:
+    def get_feedback_by_id(
+        self, id: str, db: Optional[Session] = None
+    ) -> Optional[FeedbackModel]:
         try:
             with get_db_context(db) as db:
                 feedback = db.query(Feedback).filter_by(id=id).first()
@@ -228,15 +230,23 @@ class FeedbackTable:
                 elif order_by == "model_id":
                     # it's stored in feedback.data['model_id']
                     if direction == "asc":
-                        query = query.order_by(Feedback.data["model_id"].as_string().asc())
+                        query = query.order_by(
+                            Feedback.data["model_id"].as_string().asc()
+                        )
                     else:
-                        query = query.order_by(Feedback.data["model_id"].as_string().desc())
+                        query = query.order_by(
+                            Feedback.data["model_id"].as_string().desc()
+                        )
                 elif order_by == "rating":
                     # it's stored in feedback.data['rating']
                     if direction == "asc":
-                        query = query.order_by(Feedback.data["rating"].as_string().asc())
+                        query = query.order_by(
+                            Feedback.data["rating"].as_string().asc()
+                        )
                     else:
-                        query = query.order_by(Feedback.data["rating"].as_string().desc())
+                        query = query.order_by(
+                            Feedback.data["rating"].as_string().desc()
+                        )
                 elif order_by == "updated_at":
                     if direction == "asc":
                         query = query.order_by(Feedback.updated_at.asc())
@@ -270,10 +280,14 @@ class FeedbackTable:
         with get_db_context(db) as db:
             return [
                 FeedbackModel.model_validate(feedback)
-                for feedback in db.query(Feedback).order_by(Feedback.updated_at.desc()).all()
+                for feedback in db.query(Feedback)
+                .order_by(Feedback.updated_at.desc())
+                .all()
             ]
 
-    def get_all_feedback_ids(self, db: Optional[Session] = None) -> list[FeedbackIdResponse]:
+    def get_all_feedback_ids(
+        self, db: Optional[Session] = None
+    ) -> list[FeedbackIdResponse]:
         with get_db_context(db) as db:
             return [
                 FeedbackIdResponse(
@@ -365,11 +379,15 @@ class FeedbackTable:
             d = start_date + timedelta(days=i)
             date_str = d.strftime("%Y-%m-%d")
             counts = daily_counts.get(date_str, {"won": 0, "lost": 0})
-            result.append(ModelHistoryEntry(date=date_str, won=counts["won"], lost=counts["lost"]))
+            result.append(
+                ModelHistoryEntry(date=date_str, won=counts["won"], lost=counts["lost"])
+            )
 
         return result
 
-    def get_feedbacks_by_type(self, type: str, db: Optional[Session] = None) -> list[FeedbackModel]:
+    def get_feedbacks_by_type(
+        self, type: str, db: Optional[Session] = None
+    ) -> list[FeedbackModel]:
         with get_db_context(db) as db:
             return [
                 FeedbackModel.model_validate(feedback)
@@ -455,7 +473,9 @@ class FeedbackTable:
             db.commit()
             return True
 
-    def delete_feedbacks_by_user_id(self, user_id: str, db: Optional[Session] = None) -> bool:
+    def delete_feedbacks_by_user_id(
+        self, user_id: str, db: Optional[Session] = None
+    ) -> bool:
         with get_db_context(db) as db:
             result = db.query(Feedback).filter_by(user_id=user_id).delete()
             db.commit()

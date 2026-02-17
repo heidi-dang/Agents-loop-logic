@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 import time
 import re
 
+from urllib.parse import quote
 from huggingface_hub import snapshot_download
 from langchain_classic.retrievers import (
     ContextualCompressionRetriever,
@@ -18,6 +19,7 @@ from langchain_classic.retrievers import (
 from langchain_community.retrievers import BM25Retriever
 from langchain_core.documents import Document
 
+from open_webui.config import VECTOR_DB
 from open_webui.retrieval.vector.factory import VECTOR_DB_CLIENT
 
 
@@ -133,7 +135,9 @@ class VectorSearchRetriever(BaseRetriever):
         return results
 
 
-def query_doc(collection_name: str, query_embedding: list[float], k: int, user: UserModel = None):
+def query_doc(
+    collection_name: str, query_embedding: list[float], k: int, user: UserModel = None
+):
     try:
         log.debug(f"query_doc:doc {collection_name}")
         result = VECTOR_DB_CLIENT.search(
@@ -174,8 +178,12 @@ def get_enriched_texts(collection_result: GetResult) -> list[str]:
         # Add filename (repeat twice for extra weight in BM25 scoring)
         if metadata.get("name"):
             filename = metadata["name"]
-            filename_tokens = filename.replace("_", " ").replace("-", " ").replace(".", " ")
-            metadata_parts.append(f"Filename: {filename} {filename_tokens} {filename_tokens}")
+            filename_tokens = (
+                filename.replace("_", " ").replace("-", " ").replace(".", " ")
+            )
+            metadata_parts.append(
+                f"Filename: {filename} {filename_tokens} {filename_tokens}"
+            )
 
         # Add title if available
         if metadata.get("title"):
@@ -255,7 +263,9 @@ async def query_doc_with_hybrid_search(
                 retrievers=[vector_search_retriever], weights=[1.0]
             )
         elif hybrid_bm25_weight >= 1:
-            ensemble_retriever = EnsembleRetriever(retrievers=[bm25_retriever], weights=[1.0])
+            ensemble_retriever = EnsembleRetriever(
+                retrievers=[bm25_retriever], weights=[1.0]
+            )
         else:
             ensemble_retriever = EnsembleRetriever(
                 retrievers=[bm25_retriever, vector_search_retriever],
@@ -298,7 +308,8 @@ async def query_doc_with_hybrid_search(
         }
 
         log.info(
-            "query_doc_with_hybrid_search:result " + f"{result['metadatas']} {result['distances']}"
+            "query_doc_with_hybrid_search:result "
+            + f'{result["metadatas"]} {result["distances"]}'
         )
         return result
     except Exception as e:
@@ -416,7 +427,9 @@ async def query_collection(
             return None, e
 
     # Generate all query embeddings (in one call)
-    query_embeddings = await embedding_function(queries, prefix=RAG_EMBEDDING_QUERY_PREFIX)
+    query_embeddings = await embedding_function(
+        queries, prefix=RAG_EMBEDDING_QUERY_PREFIX
+    )
     log.debug(
         f"query_collection: processing {len(queries)} queries across {len(collection_names)} collections"
     )
@@ -425,7 +438,9 @@ async def query_collection(
         future_results = []
         for query_embedding in query_embeddings:
             for collection_name in collection_names:
-                result = executor.submit(process_query_collection, collection_name, query_embedding)
+                result = executor.submit(
+                    process_query_collection, collection_name, query_embedding
+                )
                 future_results.append(result)
         task_results = [future.result() for future in future_results]
 
@@ -529,7 +544,9 @@ def generate_openai_batch_embeddings(
     user: UserModel = None,
 ) -> Optional[list[list[float]]]:
     try:
-        log.debug(f"generate_openai_batch_embeddings:model {model} batch size: {len(texts)}")
+        log.debug(
+            f"generate_openai_batch_embeddings:model {model} batch size: {len(texts)}"
+        )
         json_data = {"input": texts, "model": model}
         if isinstance(RAG_EMBEDDING_PREFIX_FIELD_NAME, str) and isinstance(prefix, str):
             json_data[RAG_EMBEDDING_PREFIX_FIELD_NAME] = prefix
@@ -566,7 +583,9 @@ async def agenerate_openai_batch_embeddings(
     user: UserModel = None,
 ) -> Optional[list[list[float]]]:
     try:
-        log.debug(f"agenerate_openai_batch_embeddings:model {model} batch size: {len(texts)}")
+        log.debug(
+            f"agenerate_openai_batch_embeddings:model {model} batch size: {len(texts)}"
+        )
         form_data = {"input": texts, "model": model}
         if isinstance(RAG_EMBEDDING_PREFIX_FIELD_NAME, str) and isinstance(prefix, str):
             form_data[RAG_EMBEDDING_PREFIX_FIELD_NAME] = prefix
@@ -701,7 +720,9 @@ def generate_ollama_batch_embeddings(
     user: UserModel = None,
 ) -> Optional[list[list[float]]]:
     try:
-        log.debug(f"generate_ollama_batch_embeddings:model {model} batch size: {len(texts)}")
+        log.debug(
+            f"generate_ollama_batch_embeddings:model {model} batch size: {len(texts)}"
+        )
         json_data = {"input": texts, "model": model}
         if isinstance(RAG_EMBEDDING_PREFIX_FIELD_NAME, str) and isinstance(prefix, str):
             json_data[RAG_EMBEDDING_PREFIX_FIELD_NAME] = prefix
@@ -739,7 +760,9 @@ async def agenerate_ollama_batch_embeddings(
     user: UserModel = None,
 ) -> Optional[list[list[float]]]:
     try:
-        log.debug(f"agenerate_ollama_batch_embeddings:model {model} batch size: {len(texts)}")
+        log.debug(
+            f"agenerate_ollama_batch_embeddings:model {model} batch size: {len(texts)}"
+        )
         form_data = {"input": texts, "model": model}
         if isinstance(RAG_EMBEDDING_PREFIX_FIELD_NAME, str) and isinstance(prefix, str):
             form_data[RAG_EMBEDDING_PREFIX_FIELD_NAME] = prefix
@@ -798,18 +821,16 @@ def get_embedding_function(
 
         return async_embedding_function
     elif embedding_engine in ["ollama", "openai", "azure_openai"]:
-
-        def embedding_function(query, prefix=None, user=None):
-            return generate_embeddings(
-                engine=embedding_engine,
-                model=embedding_model,
-                text=query,
-                prefix=prefix,
-                url=url,
-                key=key,
-                user=user,
-                azure_api_version=azure_api_version,
-            )
+        embedding_function = lambda query, prefix=None, user=None: generate_embeddings(
+            engine=embedding_engine,
+            model=embedding_model,
+            text=query,
+            prefix=prefix,
+            url=url,
+            key=key,
+            user=user,
+            azure_api_version=azure_api_version,
+        )
 
         async def async_embedding_function(query, prefix=None, user=None):
             if isinstance(query, list):
@@ -825,7 +846,8 @@ def get_embedding_function(
                     )
                     # Execute all batches in parallel
                     tasks = [
-                        embedding_function(batch, prefix=prefix, user=user) for batch in batches
+                        embedding_function(batch, prefix=prefix, user=user)
+                        for batch in batches
                     ]
                     batch_results = await asyncio.gather(*tasks)
                 else:
@@ -931,7 +953,9 @@ async def get_sources_from_items(
     full_context=False,
     user: Optional[UserModel] = None,
 ):
-    log.debug(f"items: {items} {queries} {embedding_function} {reranking_function} {full_context}")
+    log.debug(
+        f"items: {items} {queries} {embedding_function} {reranking_function} {full_context}"
+    )
 
     extracted_collections = []
     query_results = []
@@ -948,7 +972,9 @@ async def get_sources_from_items(
                 if item.get("file"):
                     # if item has file data, use it
                     query_result = {
-                        "documents": [[item.get("file", {}).get("data", {}).get("content")]],
+                        "documents": [
+                            [item.get("file", {}).get("data", {}).get("content")]
+                        ],
                         "metadatas": [[item.get("file", {}).get("meta", {})]],
                     }
 
@@ -960,14 +986,18 @@ async def get_sources_from_items(
                 elif item.get("file"):
                     # If item has file data, use it
                     query_result = {
-                        "documents": [[item.get("file", {}).get("data", {}).get("content")]],
+                        "documents": [
+                            [item.get("file", {}).get("data", {}).get("content")]
+                        ],
                         "metadatas": [[item.get("file", {}).get("meta", {})]],
                     }
                 else:
                     # Fallback to item content
                     query_result = {
                         "documents": [[item.get("content")]],
-                        "metadatas": [[{"file_id": item.get("id"), "name": item.get("name")}]],
+                        "metadatas": [
+                            [{"file_id": item.get("id"), "name": item.get("name")}]
+                        ],
                     }
 
         elif item.get("type") == "note":
@@ -1030,13 +1060,17 @@ async def get_sources_from_items(
                     # Manual Full Mode Toggle
                     # Used from chat file modal, we can assume that the file content will be available from item.get("file").get("data", {}).get("content")
                     query_result = {
-                        "documents": [[item.get("file", {}).get("data", {}).get("content", "")]],
+                        "documents": [
+                            [item.get("file", {}).get("data", {}).get("content", "")]
+                        ],
                         "metadatas": [
                             [
                                 {
                                     "file_id": item.get("id"),
                                     "name": item.get("name"),
-                                    **item.get("file").get("data", {}).get("metadata", {}),
+                                    **item.get("file")
+                                    .get("data", {})
+                                    .get("metadata", {}),
                                 }
                             ]
                         ],
@@ -1155,7 +1189,7 @@ async def get_sources_from_items(
                                 hybrid_bm25_weight=hybrid_bm25_weight,
                                 enable_enriched_texts=request.app.state.config.ENABLE_RAG_HYBRID_SEARCH_ENRICHED_TEXTS,
                             )
-                        except Exception:
+                        except Exception as e:
                             log.debug(
                                 "Error when using hybrid search, using non hybrid search as fallback."
                             )
@@ -1215,7 +1249,11 @@ def get_model_path(model: str, update_model: bool = False):
     log.debug(f"snapshot_kwargs: {snapshot_kwargs}")
 
     # Inspiration from upstream sentence_transformers
-    if os.path.exists(model) or ("\\" in model or model.count("/") > 1) and local_files_only:
+    if (
+        os.path.exists(model)
+        or ("\\" in model or model.count("/") > 1)
+        and local_files_only
+    ):
         # If fully qualified path exists, return input, else set repo_id
         return model
     elif "/" not in model:
@@ -1284,7 +1322,9 @@ class RerankCompressor(BaseDocumentCompressor):
         else:
             from sentence_transformers import util
 
-            query_embedding = await self.embedding_function(query, RAG_EMBEDDING_QUERY_PREFIX)
+            query_embedding = await self.embedding_function(
+                query, RAG_EMBEDDING_QUERY_PREFIX
+            )
             document_embedding = await self.embedding_function(
                 [doc.page_content for doc in documents], RAG_EMBEDDING_CONTENT_PREFIX
             )
@@ -1298,7 +1338,9 @@ class RerankCompressor(BaseDocumentCompressor):
                 )
             )
             if self.r_score:
-                docs_with_scores = [(d, s) for d, s in docs_with_scores if s >= self.r_score]
+                docs_with_scores = [
+                    (d, s) for d, s in docs_with_scores if s >= self.r_score
+                ]
 
             result = sorted(docs_with_scores, key=operator.itemgetter(1), reverse=True)
             final_results = []

@@ -46,7 +46,9 @@ class MinerULoader:
 
         # Validate API mode
         if self.api_mode not in ["local", "cloud"]:
-            raise ValueError(f"Invalid API mode: {self.api_mode}. Must be 'local' or 'cloud'")
+            raise ValueError(
+                f"Invalid API mode: {self.api_mode}. Must be 'local' or 'cloud'"
+            )
 
         # Validate Cloud API requirements
         if self.api_mode == "cloud" and not self.api_key:
@@ -193,7 +195,9 @@ class MinerULoader:
         result = self._poll_batch_status(batch_id, filename)
 
         # Step 4: Download and extract markdown from ZIP
-        markdown_content = self._download_and_extract_zip(result["full_zip_url"], filename)
+        markdown_content = self._download_and_extract_zip(
+            result["full_zip_url"], filename
+        )
 
         log.info(f"Successfully parsed document with MinerU Cloud API: {filename}")
 
@@ -291,7 +295,7 @@ class MinerULoader:
         """
         Upload file to presigned URL (no authentication needed).
         """
-        log.info("Uploading file to presigned URL")
+        log.info(f"Uploading file to presigned URL")
 
         try:
             with open(self.file_path, "rb") as f:
@@ -453,6 +457,7 @@ class MinerULoader:
 
                 # Find markdown file - search recursively for any .md file
                 markdown_content = None
+                found_md_path = None
 
                 # First, list all files in the ZIP for debugging
                 all_files = []
@@ -462,11 +467,14 @@ class MinerULoader:
                         all_files.append(full_path)
                         # Look for any .md file
                         if file.endswith(".md"):
+                            found_md_path = full_path
                             log.info(f"Found markdown file at: {full_path}")
                             try:
                                 with open(full_path, "r", encoding="utf-8") as f:
                                     markdown_content = f.read()
-                                if markdown_content:  # Use the first non-empty markdown file
+                                if (
+                                    markdown_content
+                                ):  # Use the first non-empty markdown file
                                     break
                             except Exception as e:
                                 log.warning(f"Failed to read {full_path}: {e}")
@@ -478,9 +486,13 @@ class MinerULoader:
                     # Try to provide more helpful error message
                     md_files = [f for f in all_files if f.endswith(".md")]
                     if md_files:
-                        error_msg = f"Found .md files but couldn't read them: {md_files}"
+                        error_msg = (
+                            f"Found .md files but couldn't read them: {md_files}"
+                        )
                     else:
-                        error_msg = f"No .md files found in ZIP. Available files: {all_files}"
+                        error_msg = (
+                            f"No .md files found in ZIP. Available files: {all_files}"
+                        )
                     raise HTTPException(
                         status.HTTP_502_BAD_GATEWAY,
                         detail=error_msg,
@@ -506,5 +518,7 @@ class MinerULoader:
                 detail="Extracted markdown content is empty",
             )
 
-        log.info(f"Successfully extracted markdown content ({len(markdown_content)} characters)")
+        log.info(
+            f"Successfully extracted markdown content ({len(markdown_content)} characters)"
+        )
         return markdown_content

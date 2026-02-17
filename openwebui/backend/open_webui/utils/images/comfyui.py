@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import random
+import requests
 import aiohttp
 import urllib.parse
 import urllib.request
@@ -150,26 +151,40 @@ async def comfyui_create_image(
                     workflow[node_id]["inputs"][node.key] = model
             elif node.type == "prompt":
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][node.key if node.key else "text"] = payload.prompt
+                    workflow[node_id]["inputs"][
+                        node.key if node.key else "text"
+                    ] = payload.prompt
             elif node.type == "negative_prompt":
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][node.key if node.key else "text"] = (
-                        payload.negative_prompt
-                    )
+                    workflow[node_id]["inputs"][
+                        node.key if node.key else "text"
+                    ] = payload.negative_prompt
             elif node.type == "width":
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][node.key if node.key else "width"] = payload.width
+                    workflow[node_id]["inputs"][
+                        node.key if node.key else "width"
+                    ] = payload.width
             elif node.type == "height":
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][node.key if node.key else "height"] = payload.height
+                    workflow[node_id]["inputs"][
+                        node.key if node.key else "height"
+                    ] = payload.height
             elif node.type == "n":
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][node.key if node.key else "batch_size"] = payload.n
+                    workflow[node_id]["inputs"][
+                        node.key if node.key else "batch_size"
+                    ] = payload.n
             elif node.type == "steps":
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][node.key if node.key else "steps"] = payload.steps
+                    workflow[node_id]["inputs"][
+                        node.key if node.key else "steps"
+                    ] = payload.steps
             elif node.type == "seed":
-                seed = payload.seed if payload.seed else random.randint(0, 1125899906842624)
+                seed = (
+                    payload.seed
+                    if payload.seed
+                    else random.randint(0, 1125899906842624)
+                )
                 for node_id in node.node_ids:
                     workflow[node_id]["inputs"][node.key] = seed
         else:
@@ -188,7 +203,9 @@ async def comfyui_create_image(
     try:
         log.info("Sending workflow to WebSocket server.")
         log.info(f"Workflow: {workflow}")
-        images = await asyncio.to_thread(get_images, ws, workflow, client_id, base_url, api_key)
+        images = await asyncio.to_thread(
+            get_images, ws, workflow, client_id, base_url, api_key
+        )
     except Exception as e:
         log.exception(f"Error while receiving images: {e}")
         images = None
@@ -233,26 +250,40 @@ async def comfyui_edit_image(
                         workflow[node_id]["inputs"][node.key] = payload.image
             elif node.type == "prompt":
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][node.key if node.key else "text"] = payload.prompt
+                    workflow[node_id]["inputs"][
+                        node.key if node.key else "text"
+                    ] = payload.prompt
             elif node.type == "negative_prompt":
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][node.key if node.key else "text"] = (
-                        payload.negative_prompt
-                    )
+                    workflow[node_id]["inputs"][
+                        node.key if node.key else "text"
+                    ] = payload.negative_prompt
             elif node.type == "width":
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][node.key if node.key else "width"] = payload.width
+                    workflow[node_id]["inputs"][
+                        node.key if node.key else "width"
+                    ] = payload.width
             elif node.type == "height":
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][node.key if node.key else "height"] = payload.height
+                    workflow[node_id]["inputs"][
+                        node.key if node.key else "height"
+                    ] = payload.height
             elif node.type == "n":
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][node.key if node.key else "batch_size"] = payload.n
+                    workflow[node_id]["inputs"][
+                        node.key if node.key else "batch_size"
+                    ] = payload.n
             elif node.type == "steps":
                 for node_id in node.node_ids:
-                    workflow[node_id]["inputs"][node.key if node.key else "steps"] = payload.steps
+                    workflow[node_id]["inputs"][
+                        node.key if node.key else "steps"
+                    ] = payload.steps
             elif node.type == "seed":
-                seed = payload.seed if payload.seed else random.randint(0, 1125899906842624)
+                seed = (
+                    payload.seed
+                    if payload.seed
+                    else random.randint(0, 1125899906842624)
+                )
                 for node_id in node.node_ids:
                     workflow[node_id]["inputs"][node.key] = seed
         else:
@@ -271,7 +302,9 @@ async def comfyui_edit_image(
     try:
         log.info("Sending workflow to WebSocket server.")
         log.info(f"Workflow: {workflow}")
-        images = await asyncio.to_thread(get_images, ws, workflow, client_id, base_url, api_key)
+        images = await asyncio.to_thread(
+            get_images, ws, workflow, client_id, base_url, api_key
+        )
     except Exception as e:
         log.exception(f"Error while receiving images: {e}")
         images = None

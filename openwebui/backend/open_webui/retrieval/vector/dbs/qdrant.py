@@ -120,7 +120,9 @@ class QdrantClient(VectorDBBase):
 
     def _create_collection_if_not_exists(self, collection_name, dimension):
         if not self.has_collection(collection_name=collection_name):
-            self._create_collection(collection_name=collection_name, dimension=dimension)
+            self._create_collection(
+                collection_name=collection_name, dimension=dimension
+            )
 
     def _create_points(self, items: list[VectorItem]):
         return [
@@ -133,7 +135,9 @@ class QdrantClient(VectorDBBase):
         ]
 
     def has_collection(self, collection_name: str) -> bool:
-        return self.client.collection_exists(f"{self.collection_prefix}_{collection_name}")
+        return self.client.collection_exists(
+            f"{self.collection_prefix}_{collection_name}"
+        )
 
     def delete_collection(self, collection_name: str):
         return self.client.delete_collection(
@@ -222,28 +226,26 @@ class QdrantClient(VectorDBBase):
 
         if ids:
             for id_value in ids:
-                (
-                    field_conditions.append(
-                        models.FieldCondition(
-                            key="metadata.id",
-                            match=models.MatchValue(value=id_value),
-                        ),
+                field_conditions.append(
+                    models.FieldCondition(
+                        key="metadata.id",
+                        match=models.MatchValue(value=id_value),
                     ),
-                )
+                ),
         elif filter:
             for key, value in filter.items():
-                (
-                    field_conditions.append(
-                        models.FieldCondition(
-                            key=f"metadata.{key}",
-                            match=models.MatchValue(value=value),
-                        ),
+                field_conditions.append(
+                    models.FieldCondition(
+                        key=f"metadata.{key}",
+                        match=models.MatchValue(value=value),
                     ),
-                )
+                ),
 
         return self.client.delete(
             collection_name=f"{self.collection_prefix}_{collection_name}",
-            points_selector=models.FilterSelector(filter=models.Filter(must=field_conditions)),
+            points_selector=models.FilterSelector(
+                filter=models.Filter(must=field_conditions)
+            ),
         )
 
     def reset(self):

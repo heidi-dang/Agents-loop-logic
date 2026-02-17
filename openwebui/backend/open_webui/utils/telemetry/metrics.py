@@ -18,7 +18,7 @@ high-cardinality label sets.
 from __future__ import annotations
 
 import time
-from typing import Dict, List, Sequence
+from typing import Dict, List, Sequence, Any
 from base64 import b64encode
 
 from fastapi import FastAPI, Request
@@ -38,6 +38,7 @@ from opentelemetry.sdk.metrics.export import (
 from opentelemetry.sdk.resources import Resource
 
 from open_webui.env import (
+    OTEL_SERVICE_NAME,
     OTEL_METRICS_EXPORTER_OTLP_ENDPOINT,
     OTEL_METRICS_BASIC_AUTH_USERNAME,
     OTEL_METRICS_BASIC_AUTH_PASSWORD,
@@ -53,7 +54,9 @@ def _build_meter_provider(resource: Resource) -> MeterProvider:
     """Return a configured MeterProvider."""
     headers = []
     if OTEL_METRICS_BASIC_AUTH_USERNAME and OTEL_METRICS_BASIC_AUTH_PASSWORD:
-        auth_string = f"{OTEL_METRICS_BASIC_AUTH_USERNAME}:{OTEL_METRICS_BASIC_AUTH_PASSWORD}"
+        auth_string = (
+            f"{OTEL_METRICS_BASIC_AUTH_USERNAME}:{OTEL_METRICS_BASIC_AUTH_PASSWORD}"
+        )
         auth_header = b64encode(auth_string.encode()).decode()
         headers = [("authorization", f"Basic {auth_header}")]
 

@@ -1,4 +1,5 @@
-from typing import Optional, Set, List, Dict, Any
+from typing import Optional, Set, Union, List, Dict, Any
+from open_webui.models.users import Users, UserModel
 from open_webui.models.groups import Groups
 
 
@@ -100,7 +101,9 @@ def has_permission(
             return True
 
     # Check default permissions afterward if the group permissions don't allow it
-    default_permissions = fill_missing_permissions(default_permissions, DEFAULT_USER_PERMISSIONS)
+    default_permissions = fill_missing_permissions(
+        default_permissions, DEFAULT_USER_PERMISSIONS
+    )
     return get_permission(default_permissions, permission_hierarchy)
 
 
@@ -136,9 +139,15 @@ def has_access(
             continue
         principal_type = grant.get("principal_type")
         principal_id = grant.get("principal_id")
-        if principal_type == "user" and (principal_id == "*" or principal_id == user_id):
+        if principal_type == "user" and (
+            principal_id == "*" or principal_id == user_id
+        ):
             return True
-        if principal_type == "group" and user_group_ids and principal_id in user_group_ids:
+        if (
+            principal_type == "group"
+            and user_group_ids
+            and principal_id in user_group_ids
+        ):
             return True
 
     return False

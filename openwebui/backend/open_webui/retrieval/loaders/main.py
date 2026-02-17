@@ -19,6 +19,7 @@ from langchain_community.document_loaders import (
     UnstructuredPowerPointLoader,
     UnstructuredRSTLoader,
     UnstructuredXMLLoader,
+    YoutubeLoader,
 )
 from langchain_core.documents import Document
 
@@ -105,7 +106,7 @@ class TikaLoader:
         else:
             headers = {}
 
-        if self.extract_images:
+        if self.extract_images == True:
             headers["X-Tika-PDFextractInlineImages"] = "true"
 
         endpoint = self.url
@@ -186,12 +187,16 @@ class Loader:
         self.user = kwargs.get("user", None)
         self.kwargs = kwargs
 
-    def load(self, filename: str, file_content_type: str, file_path: str) -> list[Document]:
+    def load(
+        self, filename: str, file_content_type: str, file_path: str
+    ) -> list[Document]:
         loader = self._get_loader(filename, file_content_type, file_path)
         docs = loader.load()
 
         return [
-            Document(page_content=ftfy.fix_text(doc.page_content), metadata=doc.metadata)
+            Document(
+                page_content=ftfy.fix_text(doc.page_content), metadata=doc.metadata
+            )
             for doc in docs
         ]
 
@@ -265,12 +270,16 @@ class Loader:
                 skip_cache=self.kwargs.get("DATALAB_MARKER_SKIP_CACHE", False),
                 force_ocr=self.kwargs.get("DATALAB_MARKER_FORCE_OCR", False),
                 paginate=self.kwargs.get("DATALAB_MARKER_PAGINATE", False),
-                strip_existing_ocr=self.kwargs.get("DATALAB_MARKER_STRIP_EXISTING_OCR", False),
+                strip_existing_ocr=self.kwargs.get(
+                    "DATALAB_MARKER_STRIP_EXISTING_OCR", False
+                ),
                 disable_image_extraction=self.kwargs.get(
                     "DATALAB_MARKER_DISABLE_IMAGE_EXTRACTION", False
                 ),
                 format_lines=self.kwargs.get("DATALAB_MARKER_FORMAT_LINES", False),
-                output_format=self.kwargs.get("DATALAB_MARKER_OUTPUT_FORMAT", "markdown"),
+                output_format=self.kwargs.get(
+                    "DATALAB_MARKER_OUTPUT_FORMAT", "markdown"
+                ),
             )
         elif self.engine == "docling" and self.kwargs.get("DOCLING_SERVER_URL"):
             if self._is_text_file(file_ext, file_content_type):
@@ -319,7 +328,10 @@ class Loader:
                     azure_credential=DefaultAzureCredential(),
                     api_model=self.kwargs.get("DOCUMENT_INTELLIGENCE_MODEL"),
                 )
-        elif self.engine == "mineru" and file_ext in ["pdf"]:  # MinerU currently only supports PDF
+        elif self.engine == "mineru" and file_ext in [
+            "pdf"
+        ]:  # MinerU currently only supports PDF
+
             mineru_timeout = self.kwargs.get("MINERU_API_TIMEOUT", 300)
             if mineru_timeout:
                 try:
@@ -338,7 +350,8 @@ class Loader:
         elif (
             self.engine == "mistral_ocr"
             and self.kwargs.get("MISTRAL_OCR_API_KEY") != ""
-            and file_ext in ["pdf"]  # Mistral OCR currently only supports PDF and images
+            and file_ext
+            in ["pdf"]  # Mistral OCR currently only supports PDF and images
         ):
             loader = MistralLoader(
                 base_url=self.kwargs.get("MISTRAL_OCR_API_BASE_URL"),
