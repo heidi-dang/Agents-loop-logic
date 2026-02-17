@@ -33,6 +33,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+heidi_cli = ["ui_dist/**/*", "ui_dist/*"]
+
 [tool.ruff]
 line-length = 100
 

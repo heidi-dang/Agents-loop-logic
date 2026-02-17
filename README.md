@@ -106,6 +106,66 @@ heidi openwebui status
 heidi openwebui guide
 ```
 
+### Web UI
+
+Heidi includes a modern React-based web UI for interacting with agents through a chat interface.
+
+**Development Mode (separate ports):**
+```bash
+# Terminal 1: Start the backend API server
+heidi serve
+
+# Terminal 2: Start the UI dev server (with hot reload)
+heidi start ui
+# Or manually: cd ui && npm run dev
+
+# Access UI at http://localhost:3002
+# Backend runs at http://localhost:7777
+```
+
+**Production Mode (single port):**
+```bash
+# Build the UI for production
+heidi ui build
+
+# Start the backend server (serves UI at /ui/)
+heidi serve
+
+# Access the UI at http://localhost:7777/ui/
+```
+
+**UI Commands:**
+```bash
+heidi ui build       # Build the UI for production
+heidi ui path        # Show UI build path
+heidi ui status      # Check UI build status
+```
+
+**Configuration:**
+- UI dev server runs on port 3002 (Vite)
+- Backend API runs on port 7777 (FastAPI)
+- Vite proxy forwards API calls from :3002 → :7777 during development
+- Production UI is served at `/ui/` by the backend server
+- Set `HEIDI_UI_DIST` env var to override the UI dist directory
+
+**Production Deployment with Custom Domain:**
+
+When deploying with a reverse proxy (e.g., Cloudflare Tunnel, Nginx), the Vite dev server needs to trust your domain:
+
+1. The `vite.config.ts` already includes `heidiai.com.au` in `allowedHosts`
+2. For other domains, set the `HEIDI_CORS_ORIGINS` environment variable:
+   ```bash
+   export HEIDI_CORS_ORIGINS="https://your-domain.com,https://www.your-domain.com"
+   heidi serve
+   ```
+3. Or use the `--cors-origins` flag when starting the server
+
+**Port Reference:**
+| Service | Port | Purpose |
+|---------|------|---------|
+| Vite Dev Server | 3002 | Development UI with hot reload |
+| Heidi Backend | 7777 | API server + production UI |
+
 ## CLI Commands
 
 | Command | Description |
