@@ -1,4 +1,3 @@
-
 import sys
 
 # Ensure pydantic is not mocked (CI Fix)
@@ -7,16 +6,21 @@ try:
     from unittest.mock import MagicMock
 
     # If pydantic is a mock, force reload the real module
-    if isinstance(pydantic, MagicMock) or hasattr(pydantic, 'mock_calls') or not hasattr(pydantic, '__file__'):
+    if (
+        isinstance(pydantic, MagicMock)
+        or hasattr(pydantic, "mock_calls")
+        or not hasattr(pydantic, "__file__")
+    ):
         print("DEBUG: Detected pydantic mock, attempting to reload real module...")
-        if 'pydantic' in sys.modules:
-            del sys.modules['pydantic']
-        if 'pydantic.main' in sys.modules:
-            del sys.modules['pydantic.main']
-        if 'fastapi' in sys.modules:
-            del sys.modules['fastapi']
+        if "pydantic" in sys.modules:
+            del sys.modules["pydantic"]
+        if "pydantic.main" in sys.modules:
+            del sys.modules["pydantic.main"]
+        if "fastapi" in sys.modules:
+            del sys.modules["fastapi"]
 
         import pydantic
+
         print(f"DEBUG: Reloaded pydantic: {pydantic}")
 except ImportError:
     pass
@@ -27,6 +31,7 @@ from unittest.mock import patch
 from heidi_cli.server import app
 
 client = TestClient(app)
+
 
 def test_path_traversal_blocked(tmp_path):
     """Test that path traversal attempts are blocked."""
@@ -68,6 +73,7 @@ def test_path_traversal_blocked(tmp_path):
         response = client.get("/ui/subdir/..%2Fstyle.css")
         assert response.status_code == 200
         assert response.text == "body { color: red; }"
+
 
 def test_symlink_behavior(tmp_path):
     """Test behavior with symlinks."""

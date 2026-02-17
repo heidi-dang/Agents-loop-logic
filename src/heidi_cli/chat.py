@@ -139,9 +139,7 @@ async def start_chat_repl(executor_name: str, model: Optional[str] = None, reset
             policy = policy_from_env()
             if policy.allow_live:
                 with safe_tty(console):
-                    with console.status(
-                        f"[bold cyan]{executor_name} is thinking...[/bold cyan]"
-                    ):
+                    with console.status(f"[bold cyan]{executor_name} is thinking...[/bold cyan]"):
                         response = await session.send(user_input)
             else:
                 response = await session.send(user_input)

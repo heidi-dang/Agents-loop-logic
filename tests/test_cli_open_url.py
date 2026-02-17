@@ -2,15 +2,19 @@ import unittest
 from unittest.mock import patch, MagicMock
 from heidi_cli.cli import open_url
 
+
 class TestOpenUrl(unittest.TestCase):
-    @patch('shutil.which')
-    @patch('subprocess.run')
-    @patch('webbrowser.open')
-    @patch('heidi_cli.cli.console.print')
-    def test_open_url_success_subprocess(self, mock_print, mock_webbrowser_open, mock_run, mock_which):
+    @patch("shutil.which")
+    @patch("subprocess.run")
+    @patch("webbrowser.open")
+    @patch("heidi_cli.cli.console.print")
+    def test_open_url_success_subprocess(
+        self, mock_print, mock_webbrowser_open, mock_run, mock_which
+    ):
         # Setup: shutil.which returns a path for 'xdg-open'
         def which_side_effect(cmd):
-            return '/usr/bin/' + cmd if cmd == 'xdg-open' else None
+            return "/usr/bin/" + cmd if cmd == "xdg-open" else None
+
         mock_which.side_effect = which_side_effect
 
         # Setup: subprocess.run returns success
@@ -22,7 +26,7 @@ class TestOpenUrl(unittest.TestCase):
         # Verify: xdg-open was called
         mock_run.assert_called()
         args = mock_run.call_args[0][0]
-        self.assertIn('xdg-open', args)
+        self.assertIn("xdg-open", args)
         self.assertIn(url, args)
 
         # Verify: webbrowser.open was NOT called
@@ -31,11 +35,13 @@ class TestOpenUrl(unittest.TestCase):
         # Verify: failure message was NOT printed
         mock_print.assert_not_called()
 
-    @patch('shutil.which')
-    @patch('subprocess.run')
-    @patch('webbrowser.open')
-    @patch('heidi_cli.cli.console.print')
-    def test_open_url_success_webbrowser(self, mock_print, mock_webbrowser_open, mock_run, mock_which):
+    @patch("shutil.which")
+    @patch("subprocess.run")
+    @patch("webbrowser.open")
+    @patch("heidi_cli.cli.console.print")
+    def test_open_url_success_webbrowser(
+        self, mock_print, mock_webbrowser_open, mock_run, mock_which
+    ):
         # Setup: shutil.which returns None for everything (or simulate failures)
         mock_which.return_value = None
 
@@ -51,16 +57,16 @@ class TestOpenUrl(unittest.TestCase):
         # Verify: failure message was NOT printed
         mock_print.assert_not_called()
 
-    @patch('shutil.which')
-    @patch('subprocess.run')
-    @patch('webbrowser.open')
-    @patch('heidi_cli.cli.console.print')
+    @patch("shutil.which")
+    @patch("subprocess.run")
+    @patch("webbrowser.open")
+    @patch("heidi_cli.cli.console.print")
     def test_open_url_failure(self, mock_print, mock_webbrowser_open, mock_run, mock_which):
         # Setup: all external commands fail
         mock_which.return_value = None
 
         # Setup: webbrowser.open fails (returns False or raises)
-        mock_webbrowser_open.return_value = False # or .side_effect = Exception
+        mock_webbrowser_open.return_value = False  # or .side_effect = Exception
 
         url = "http://example.com"
         open_url(url)
@@ -70,6 +76,7 @@ class TestOpenUrl(unittest.TestCase):
 
         # Verify Panel content includes the expected instructions
         from rich.panel import Panel
+
         panel = mock_print.call_args[0][0]
         self.assertIsInstance(panel, Panel)
 
@@ -80,5 +87,6 @@ class TestOpenUrl(unittest.TestCase):
         self.assertIn("export BROWSER", content)
         self.assertIn("pbcopy", content)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

@@ -637,7 +637,6 @@ class Pipe:
                     filename = filename.strip()
                     if filename.startswith("{"):
                         try:
-
                             data = json.loads(filename)
                             if isinstance(data, dict):
                                 filename = data.get("filename") or data.get("file") or filename
@@ -688,7 +687,6 @@ class Pipe:
 
                 if token:
                     try:
-
                         base_url = str(__request__.base_url).rstrip("/")
                         upload_url = f"{base_url}/api/v1/files/"
 

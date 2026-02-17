@@ -38,6 +38,7 @@ heidi_cli = ["ui_dist/**/*", "ui_dist/*"]
 
 [tool.ruff]
 line-length = 100
+exclude = ["openwebui/"]
 
 [tool.ruff.lint]
 ignore = ["E402", "F823"]

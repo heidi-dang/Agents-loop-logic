@@ -19,6 +19,16 @@ from .auth_middleware import AuthMiddleware
 from .orchestrator.session import OrchestratorSession
 from .orchestrator.executors import pick_executor
 
+# SSH Connector (import lazily to avoid startup overhead when disabled)
+# Routes are conditionally included based on HEIDI_SSH_ENABLED
+_ssh_connector_available = False
+try:
+    from .connectors.ssh import router as ssh_router
+
+    _ssh_connector_available = True
+except ImportError:
+    pass
+
 # Optional API key protection:
 # - If HEIDI_API_KEY is set, protected endpoints require:
 #     X-Heidi-Key: <key>
@@ -108,6 +118,10 @@ app.add_middleware(
 app.add_middleware(AuthMiddleware)
 
 init_db()
+
+# Include SSH connector routes if available
+if _ssh_connector_available:
+    app.include_router(ssh_router)
 
 
 def _check_auth(request: Request, stream_key: Optional[str] = None) -> bool:

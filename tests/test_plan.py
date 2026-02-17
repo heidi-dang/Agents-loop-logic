@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from heidi_cli.orchestrator.plan import extract_routing, parse_routing
 
+
 class TestPlan:
     def test_extract_routing_success(self):
         text = """

@@ -6,7 +6,6 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 
-
 @pytest.mark.anyio
 @pytest.mark.skip(reason="httpx mocking needs refactoring for PR #33")
 async def test_pipe_routing_chat():
