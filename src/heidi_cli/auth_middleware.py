@@ -54,7 +54,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 email="system@local",
                 name="System User",
                 avatar_url=None,
-                created_at=datetime.utcnow()
+                created_at=datetime.utcnow(),
             )
             # Proceed without checking session
             return await call_next(request)

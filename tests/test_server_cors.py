@@ -1,8 +1,8 @@
-
 from fastapi.testclient import TestClient
 from heidi_cli.server import app
 
 client = TestClient(app)
+
 
 def test_cors_valid_request():
     """Test that valid CORS requests are accepted."""
@@ -32,8 +32,16 @@ def test_cors_valid_request():
     lower_allow_headers = allow_headers.lower()
     assert "*" not in lower_allow_headers
 
-    for header in ["content-type", "x-heidi-key", "authorization", "accept", "origin", "x-requested-with"]:
+    for header in [
+        "content-type",
+        "x-heidi-key",
+        "authorization",
+        "accept",
+        "origin",
+        "x-requested-with",
+    ]:
         assert header in lower_allow_headers
+
 
 def test_cors_invalid_header_request():
     """Test that requesting an invalid header results in rejection or exclusion."""

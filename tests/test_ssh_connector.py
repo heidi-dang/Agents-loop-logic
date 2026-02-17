@@ -8,21 +8,15 @@ Tests cover:
 - Authentication requirements
 """
 
-import json
-import os
-import tempfile
-from pathlib import Path
-
 import pytest
 from fastapi.testclient import TestClient
 
 
 # Import modules without env vars set - tests must use monkeypatch
-from heidi_cli.connectors.ssh.session import SSHSession, get_session_manager
+from heidi_cli.connectors.ssh.session import get_session_manager
 from heidi_cli.connectors.ssh.audit import SSHAuditLogger, redact_secrets
 from heidi_cli.connectors.ssh.connector import (
     create_session,
-    close_session,
     exec_command,
     validate_target,
 )
@@ -259,9 +253,13 @@ class TestAPIRoutes:
         monkeypatch.delenv("HEIDI_SSH_ENABLED", raising=False)
         monkeypatch.setenv("HEIDI_SSH_ENABLED", "")
 
+        import importlib
+        import heidi_cli.connectors.ssh.config as config_module
+
+        importlib.reload(config_module)
+
         response = client.post("/api/connect/ssh/sessions", json={"target": "localhost:2222"})
-        # Should be 404 when SSH is disabled
-        # Note: This test may need adjustment based on actual behavior
+        assert response.status_code == 404
 
     def test_create_session_requires_auth(self, client):
         """Creating session should require auth when API key set."""

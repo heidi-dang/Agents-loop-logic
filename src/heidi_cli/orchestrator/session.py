@@ -20,7 +20,9 @@ from .artifacts import TaskArtifact, sanitize_slug, save_audit_to_task, parse_au
 @dataclass
 class SessionState:
     id: str
-    status: str = "AWAITING_TASK"  # AWAITING_TASK, PLANNING, WAITING_FOR_APPROVAL, EXECUTING, DONE, FAILED
+    status: str = (
+        "AWAITING_TASK"  # AWAITING_TASK, PLANNING, WAITING_FOR_APPROVAL, EXECUTING, DONE, FAILED
+    )
     task: Optional[str] = None
     plan_text: Optional[str] = None
     routing: Optional[Dict[str, Any]] = None
@@ -68,11 +70,9 @@ class OrchestratorSession:
         state_file.write_text(json.dumps(asdict(self.state), indent=2))
 
     def _add_history(self, role: str, content: str):
-        self.state.history.append({
-            "role": role,
-            "content": content,
-            "timestamp": datetime.utcnow().isoformat()
-        })
+        self.state.history.append(
+            {"role": role, "content": content, "timestamp": datetime.utcnow().isoformat()}
+        )
         self._save_state()
 
     async def handle_input(self, user_input: str) -> str:
@@ -121,7 +121,7 @@ class OrchestratorSession:
         """Generate a plan for the task."""
         self.state.status = "PLANNING"
         self.state.task = task
-        self.state.workdir = str(Path.cwd()) # Capture current workdir
+        self.state.workdir = str(Path.cwd())  # Capture current workdir
         self._save_state()
 
         self._add_history("assistant", "Analyzing task and generating plan...")
@@ -134,7 +134,7 @@ class OrchestratorSession:
             result = await planner.run(prompt, Path(self.state.workdir))
 
             if not result.ok:
-                self.state.status = "AWAITING_TASK" # Reset
+                self.state.status = "AWAITING_TASK"  # Reset
                 msg = f"Planning failed: {result.output}"
                 self._add_history("assistant", msg)
                 return msg
@@ -184,7 +184,7 @@ class OrchestratorSession:
 
             # Same parsing logic...
             if not result.ok:
-                self.state.status = "WAITING_FOR_APPROVAL" # Revert to waiting state? Or reset?
+                self.state.status = "WAITING_FOR_APPROVAL"  # Revert to waiting state? Or reset?
                 msg = f"Re-planning failed: {result.output}"
                 self._add_history("assistant", msg)
                 return msg
@@ -245,7 +245,9 @@ class OrchestratorSession:
 
             # Create artifact
             artifact = TaskArtifact(slug=self.state.task_slug)
-            artifact.content = f"# Task: {self.state.task}\n\n## Approved Plan\n{self.state.plan_text}\n"
+            artifact.content = (
+                f"# Task: {self.state.task}\n\n## Approved Plan\n{self.state.plan_text}\n"
+            )
             artifact.save()
             self.state.artifacts.append(str(artifact.path))
 
@@ -271,15 +273,19 @@ class OrchestratorSession:
 
             retry_loop = True
             while retry_loop:
-                retry_loop = False # Reset flag
+                retry_loop = False  # Reset flag
                 all_batches_passed = True
 
                 for batch in batches:
                     label = batch.get("label", "batch")
                     agent_name = batch.get("agent", "high-autonomy")
-                    batch_executor = batch.get("executor", "copilot") # Default to copilot if missing
+                    batch_executor = batch.get(
+                        "executor", "copilot"
+                    )  # Default to copilot if missing
 
-                    self._add_history("assistant", f"Running batch '{label}' using {batch_executor}...")
+                    self._add_history(
+                        "assistant", f"Running batch '{label}' using {batch_executor}..."
+                    )
 
                     batch_exec = pick_executor(batch_executor)
 
@@ -304,7 +310,7 @@ IMPORTANT: When done, output DEV_COMPLETION block with:
                     if not run_res.ok:
                         self._add_history("assistant", f"Batch '{label}' failed execution.")
                         all_batches_passed = False
-                        break # Break batch loop
+                        break  # Break batch loop
 
                     # Audit
                     reviewers = batch.get("reviewers", ["reviewer-audit"])
@@ -337,7 +343,9 @@ END_AUDIT_DECISION
 
                         save_audit_to_task(self.state.task_slug, decision)
 
-                        artifact.content += f"\n### Audit ({reviewer}): {decision.status}\n{decision.why}\n"
+                        artifact.content += (
+                            f"\n### Audit ({reviewer}): {decision.status}\n{decision.why}\n"
+                        )
                         artifact.save()
 
                         if decision.status != "PASS":
@@ -347,14 +355,14 @@ END_AUDIT_DECISION
 
                     if not audit_passed:
                         all_batches_passed = False
-                        break # Break batch loop
+                        break  # Break batch loop
 
                 if not all_batches_passed:
                     self.state.retry_count += 1
                     if self.state.retry_count <= self.state.max_retries:
                         msg = f"Audit failed. Retrying ({self.state.retry_count}/{self.state.max_retries})..."
                         self._add_history("assistant", msg)
-                        retry_loop = True # Loop again
+                        retry_loop = True  # Loop again
                         continue
                     else:
                         self.state.status = "FAILED"

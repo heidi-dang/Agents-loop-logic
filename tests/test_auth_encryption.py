@@ -15,6 +15,7 @@ from heidi_cli.auth_encryption import (
     generate_code_challenge,
 )
 
+
 class TestAuthEncryption:
     def test_encrypt_decrypt_roundtrip(self, tmp_path, monkeypatch):
         # Mock HEIDI_HOME to use tmp_path for the encryption key

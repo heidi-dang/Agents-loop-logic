@@ -80,7 +80,7 @@ class TestContext:
 
         assert "large.txt" in context
         # It should be truncated or limited
-        assert len(context) < 1000 + 200 # approximate overhead
+        assert len(context) < 1000 + 200  # approximate overhead
 
     def test_collect_context_truncation(self, tmp_path):
         # Setup multiple files to exceed limit
@@ -92,4 +92,4 @@ class TestContext:
 
         assert "file1.txt" in context
         assert "file2.txt" in context
-        assert "(truncated)" in context or len(context) <= 200 # slightly loose assertion
+        assert "(truncated)" in context or len(context) <= 200  # slightly loose assertion

@@ -1,10 +1,10 @@
-
 import sys
 import unittest
 from unittest.mock import MagicMock
 
 # Defer imports to avoid collection-time errors if dependencies are missing/conflicted
 # This is crucial for CI environments where package loading order might be sensitive
+
 
 class TestSecurityVulnerability(unittest.TestCase):
     def setUp(self):
@@ -25,16 +25,16 @@ class TestSecurityVulnerability(unittest.TestCase):
         except Exception as e:
             # If pydantic error happens here, print debug info
             print(f"DEBUG: Error in setUp: {e}")
-            if 'pydantic' in sys.modules:
+            if "pydantic" in sys.modules:
                 print(f"DEBUG: pydantic module: {sys.modules['pydantic']}")
-                if hasattr(sys.modules['pydantic'], '__file__'):
+                if hasattr(sys.modules["pydantic"], "__file__"):
                     print(f"DEBUG: pydantic file: {sys.modules['pydantic'].__file__}")
                 else:
                     print("DEBUG: pydantic has no __file__")
             raise e
 
     def tearDown(self):
-        if hasattr(self, 'server_module'):
+        if hasattr(self, "server_module"):
             self.server_module.HEIDI_API_KEY = self.original_api_key
 
     def test_missing_authentication_enforcement(self):
@@ -68,7 +68,7 @@ class TestSecurityVulnerability(unittest.TestCase):
             self.assertEqual(cm.exception.status_code, 401)
 
         except ImportError:
-            pass # Handled in setUp
+            pass  # Handled in setUp
 
     def test_authentication_with_api_key(self):
         try:
@@ -98,7 +98,7 @@ class TestSecurityVulnerability(unittest.TestCase):
                 _require_api_key(mock_request_invalid)
             self.assertEqual(cm.exception.status_code, 401)
 
-             # Sub-case: No key provided
+            # Sub-case: No key provided
             mock_request_empty = MagicMock(spec=Request)
             mock_request_empty.headers = {}
             mock_request_empty.state.user = None

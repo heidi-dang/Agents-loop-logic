@@ -67,7 +67,7 @@ def heidi_state_dir() -> Path:
         return Path(base) / "Heidi"
 
     if system == "darwin":
-        return heidi_config_dir() # Fallback to config dir on macOS
+        return heidi_config_dir()  # Fallback to config dir on macOS
 
     xdg_state = os.environ.get("XDG_STATE_HOME")
     base = Path(xdg_state) if xdg_state else (Path.home() / ".local" / "state")

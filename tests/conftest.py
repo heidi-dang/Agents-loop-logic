@@ -13,11 +13,14 @@ try:
     import pydantic
 except ImportError:
     pydantic = MagicMock()
+
     class MockBaseModel:
         def __init__(self, **kwargs):
             pass
+
         def dict(self):
             return {}
+
     pydantic.BaseModel = MockBaseModel
     sys.modules["pydantic"] = pydantic
 

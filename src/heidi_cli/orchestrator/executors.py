@@ -144,6 +144,7 @@ class LMStudioExecutor(BaseExecutor):
         except Exception as e:
             return ExecResult(ok=False, output=f"Failed to connect to LM Studio: {e}")
 
+
 def pick_executor(name: str, model: Optional[str] = None):
     name = (name or "copilot").lower()
     if name == "copilot":

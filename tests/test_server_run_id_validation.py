@@ -1,4 +1,3 @@
-
 import pytest
 from unittest.mock import patch
 from fastapi import HTTPException
@@ -7,12 +6,14 @@ from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
+
 def test_validate_run_id_valid():
     validate_run_id("valid-id")
     validate_run_id("valid_id")
     validate_run_id("valid.id")
     validate_run_id("12345678")
     validate_run_id("123-abc_ABC.xyz")
+
 
 def test_validate_run_id_invalid():
     with pytest.raises(HTTPException) as excinfo:
@@ -46,6 +47,7 @@ def test_validate_run_id_invalid():
     with pytest.raises(HTTPException) as excinfo:
         validate_run_id("invalid char!")
     assert excinfo.value.status_code == 400
+
 
 def test_api_rejection_of_invalid_id():
     # We mock _require_api_key to bypass auth
