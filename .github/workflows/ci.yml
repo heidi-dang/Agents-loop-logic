@@ -7,6 +7,41 @@ on:
     branches: [main]
 
 jobs:
+  ui-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "ui/package-lock.json"
+      - name: Install UI dependencies
+        run: |
+          cd ui
+          npm ci
+      - name: Build UI
+        run: |
+          cd ui
+          npm run build
+      - name: Verify UI build output
+        run: |
+          if [ ! -f "ui/dist/index.html" ]; then
+            echo "ERROR: UI build failed - index.html not found"
+            exit 1
+          fi
+          if [ ! -d "ui/dist/assets" ]; then
+            echo "ERROR: UI build failed - assets directory not found"
+            exit 1
+          fi
+          echo "UI build successful"
+          ls -la ui/dist/
+      - name: Cache UI build
+        uses: actions/cache@v4
+        with:
+          path: ui/dist
+          key: ${{ runner.os }}-ui-build-${{ github.sha }}
+
   test:
     runs-on: ubuntu-latest
     steps:

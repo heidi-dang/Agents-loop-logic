@@ -43,8 +43,19 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Local development
-.local/
+# Local development - granular .local/ policy
+# Track: documentation and worklogs
+!.local/
+!.local/README.md
+!.local/worklog
+!.local/worklog/**
+# Ignore: secrets, state, cache, and other sensitive files
+.local/secrets/
+.local/state/
+.local/cache/
+.local/*.json
+.local/*.key
+.local/*.pem
 .heidi/
 .memory
 
@@ -75,4 +86,6 @@ openwebui/backend/data/
 
 # Memory / context
 .memory/
-heidi_cli/src/heidi_cli/ui_dist/
+
+# Packaged UI dist (built from ui/, included in package but not git)
+src/heidi_cli/ui_dist/

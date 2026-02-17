@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import path from 'path';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -7,17 +8,16 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true,
+    },
     server: {
       host: '0.0.0.0',
       port: 3002,
       strictPort: true,
-      allowedHosts: ["heidiai.com.au", ".heidiai.com.au"],
+      allowedHosts: ['heidiai.com.au', '.heidiai.com.au', 'localhost', '127.0.0.1'],
       proxy: {
-        '^/api': {
-          target: backendBase,
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, ''),
-        },
         '^/health': {
           target: backendBase,
           changeOrigin: true,
@@ -42,14 +42,16 @@ export default defineConfig(({ mode }) => {
           target: backendBase,
           changeOrigin: true,
         },
-        '^/auth': {
+        '^/api': {
           target: backendBase,
           changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, ''),
         },
-        '^/connect': {
-          target: backendBase,
-          changeOrigin: true,
-        },
+      },
+    },
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
       },
     },
   };
