@@ -6,10 +6,17 @@ set -e
 
 VERSION=""
 REF="main"
+VALID_TAG_REGEX='^v?[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9._-]+)?$'
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --version|-v)
+            if [[ -z "$2" || "$2" == -* ]]; then
+                echo "Error: --version/-v requires a value"
+                echo "Usage: $0 [--version <tag>]"
+                echo "Example: $0 --version v0.1.1"
+                exit 1
+            fi
             VERSION="$2"
             shift 2
             ;;
@@ -33,6 +40,10 @@ echo "Heidi CLI Installer (pipx mode)"
 echo "================================"
 
 if [ -n "$VERSION" ]; then
+    if ! [[ "$VERSION" =~ $VALID_TAG_REGEX ]]; then
+        echo "Error: Invalid version format. Expected format: v0.1.1 or 0.1.1"
+        exit 1
+    fi
     REF="$VERSION"
     echo "Installing heidi-cli@$REF"
 else
@@ -70,15 +81,21 @@ echo "Python version: $PYTHON_VERSION"
 if ! command -v pipx &> /dev/null; then
     echo ""
     echo "Installing pipx..."
-    $PYTHON_CMD -m pip install --user pipx
+    "$PYTHON_CMD" -m pip install --user pipx
     pipx ensurepath
     export PATH="$HOME/.local/bin:$PATH"
+fi
+
+# Build the package URL
+PKG_URL="git+https://github.com/heidi-dang/heidi-cli.git"
+if [ "$REF" != "main" ]; then
+    PKG_URL="${PKG_URL}@${REF}"
 fi
 
 echo ""
 echo "Installing Heidi CLI globally via pipx..."
 echo "Resolved ref: $REF"
-pipx install git+https://github.com/heidi-dang/heidi-cli.git@${REF}
+pipx install --force "${PKG_URL}"
 
 echo ""
 echo "Building UI into cache..."
