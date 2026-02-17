@@ -38,6 +38,9 @@ unset HEIDI_SSH_ENABLED
 | `HEIDI_SSH_MAX_SESSIONS` | `5` | Maximum concurrent SSH sessions |
 | `HEIDI_SSH_SESSION_TIMEOUT` | `300` | Session timeout in seconds (5 minutes) |
 | `HEIDI_SSH_MAX_OUTPUT` | `10485760` | Max output size in bytes (10MB) |
+| `HEIDI_SSH_BACKEND` | (not set) | SSH backend to use (currently ignored - exec is stub) |
+
+> **Note**: Command execution (`/exec`) currently returns NOT_IMPLEMENTED. Set `HEIDI_SSH_BACKEND=asyncssh` for Phase 2 real SSH support.
 
 ### Target Allowlist Format
 
@@ -53,6 +56,11 @@ export HEIDI_SSH_TARGETS="localhost:2222,192.168.1.100,server.internal"
 ```
 
 ## API Endpoints
+
+> **⚠️ Implementation Status**: This documents the API design. Currently:
+> - Session management: **IMPLEMENTED** (create, list, close)
+> - Command execution (`/exec`): **STUB** - Returns NOT_IMPLEMENTED (requires `HEIDI_SSH_BACKEND=asyncssh`)
+> - PTY streaming (`/pty/*`): **STUB** - Returns NOT_IMPLEMENTED (Phase 2)
 
 All endpoints require authentication when `HEIDI_API_KEY` is set.
 
@@ -84,7 +92,9 @@ Response:
 }
 ```
 
-#### Execute Command
+#### Execute Command (STUB)
+> **Status**: Returns NOT_IMPLEMENTED. Requires `HEIDI_SSH_BACKEND=asyncssh` to be fully functional.
+
 ```http
 POST /api/connect/ssh/sessions/{session_id}/exec
 Content-Type: application/json
@@ -97,12 +107,12 @@ X-Heidi-Key: your-api-key
 }
 ```
 
-Response:
+Response (current stub):
 ```json
 {
-  "exit_code": 0,
-  "stdout": "total 128...",
-  "stderr": "",
+  "exit_code": -1,
+  "stdout": "",
+  "stderr": "SSH exec not implemented. Set HEIDI_SSH_BACKEND=asyncssh to enable.",
   "truncated": false
 }
 ```
@@ -299,14 +309,71 @@ Set API key:
 export HEIDI_API_KEY="your-key"
 ```
 
-## Future Enhancements (Phase 2)
+#### PTY Session (Phase 2 - STUB)
+> **Status**: NOT_IMPLEMENTED. Requires `HEIDI_SSH_BACKEND=asyncssh` to be fully functional.
 
+##### Start PTY Session (STUB)
+```http
+POST /api/connect/ssh/sessions/{session_id}/pty
+Content-Type: application/json
+X-Heidi-Key: your-api-key
+
+{
+  "command": "/bin/bash",
+  "cols": 80,
+  "rows": 24
+}
+```
+
+Response (current stub):
+```json
+{
+  "pty_session_id": "pty-{session_id}",
+  "message": "PTY streaming not yet implemented. Set HEIDI_SSH_BACKEND=asyncssh to enable in Phase 2."
+}
+```
+
+##### PTY Stream (SSE - STUB)
+```http
+GET /api/connect/ssh/sessions/{session_id}/pty/{pty_session_id}/stream?key=your-api-key
+```
+
+Current stub response (text/event-stream):
+```
+data: PTY streaming not yet implemented. Set HEIDI_SSH_BACKEND=asyncssh to enable in Phase 2.
+```
+
+##### Resize PTY (STUB)
+```http
+POST /api/connect/ssh/sessions/{session_id}/pty/{pty_session_id}/resize?cols=80&rows=24
+X-Heidi-Key: your-api-key
+```
+
+Response (current stub):
+```json
+{
+  "message": "PTY resize not yet implemented. Set HEIDI_SSH_BACKEND=asyncssh to enable in Phase 2."
+}
+```
+
+## Implementation Status
+
+### Phase 1 (Current)
+- ✅ Session management (create, list, close)
+- ✅ Target allowlist enforcement
+- ✅ Audit logging
+- ✅ Security defaults (OFF by default, local-only bind, deny-by-default)
+
+### Phase 2 (Requires `HEIDI_SSH_BACKEND=asyncssh`)
+- [ ] Real SSH exec command execution
 - [ ] PTY streaming via SSE (`/sessions/{id}/pty/stream`)
-- [ ] Real SSH connections (paramiko/asyncssh)
 - [ ] Command policy enforcement (allowlist/denylist)
 - [ ] Session persistence across server restarts
-- [ ] Multi-factor authentication
 - [ ] Integration with SSH agent
+
+### Future
+- [ ] Multi-factor authentication
+- [ ] paramiko backend alternative
 
 ## Related
 
