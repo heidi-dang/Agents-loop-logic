@@ -47,15 +47,9 @@ def upgrade() -> None:
     )
 
     # Create composite indexes
-    op.create_index(
-        "chat_message_chat_parent_idx", "chat_message", ["chat_id", "parent_id"]
-    )
-    op.create_index(
-        "chat_message_model_created_idx", "chat_message", ["model_id", "created_at"]
-    )
-    op.create_index(
-        "chat_message_user_created_idx", "chat_message", ["user_id", "created_at"]
-    )
+    op.create_index("chat_message_chat_parent_idx", "chat_message", ["chat_id", "parent_id"])
+    op.create_index("chat_message_model_created_idx", "chat_message", ["model_id", "created_at"])
+    op.create_index("chat_message_user_created_idx", "chat_message", ["user_id", "created_at"])
 
     # Step 2: Backfill from existing chats
     conn = op.get_bind()

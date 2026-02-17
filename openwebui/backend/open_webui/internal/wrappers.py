@@ -46,9 +46,7 @@ def register_connection(db_url):
     if db_url.startswith("sqlite+sqlcipher://"):
         database_password = os.environ.get("DATABASE_PASSWORD")
         if not database_password or database_password.strip() == "":
-            raise ValueError(
-                "DATABASE_PASSWORD is required when using sqlite+sqlcipher:// URLs"
-            )
+            raise ValueError("DATABASE_PASSWORD is required when using sqlite+sqlcipher:// URLs")
         from playhouse.sqlcipher_ext import SqlCipherDatabase
 
         # Parse the database path from SQLCipher URL

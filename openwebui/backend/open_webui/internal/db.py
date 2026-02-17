@@ -87,9 +87,7 @@ SQLALCHEMY_DATABASE_URL = DATABASE_URL
 if SQLALCHEMY_DATABASE_URL.startswith("sqlite+sqlcipher://"):
     database_password = os.environ.get("DATABASE_PASSWORD")
     if not database_password or database_password.strip() == "":
-        raise ValueError(
-            "DATABASE_PASSWORD is required when using sqlite+sqlcipher:// URLs"
-        )
+        raise ValueError("DATABASE_PASSWORD is required when using sqlite+sqlcipher:// URLs")
 
     # Extract database path from SQLCipher URL
     db_path = SQLALCHEMY_DATABASE_URL.replace("sqlite+sqlcipher://", "")
@@ -111,9 +109,7 @@ if SQLALCHEMY_DATABASE_URL.startswith("sqlite+sqlcipher://"):
     log.info("Connected to encrypted SQLite database using SQLCipher")
 
 elif "sqlite" in SQLALCHEMY_DATABASE_URL:
-    engine = create_engine(
-        SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-    )
+    engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 
     def on_connect(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
@@ -137,16 +133,12 @@ else:
                 poolclass=QueuePool,
             )
         else:
-            engine = create_engine(
-                SQLALCHEMY_DATABASE_URL, pool_pre_ping=True, poolclass=NullPool
-            )
+            engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True, poolclass=NullPool)
     else:
         engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True)
 
 
-SessionLocal = sessionmaker(
-    autocommit=False, autoflush=False, bind=engine, expire_on_commit=False
-)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=False)
 metadata_obj = MetaData(schema=DATABASE_SCHEMA)
 Base = declarative_base(metadata=metadata_obj)
 ScopedSession = scoped_session(SessionLocal)

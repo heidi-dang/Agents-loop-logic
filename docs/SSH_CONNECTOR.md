@@ -44,6 +44,8 @@ unset HEIDI_SSH_ENABLED
 
 ### Target Allowlist Format
 
+> **Important**: Empty allowlist (`HEIDI_SSH_TARGETS=""` or unset) means **DENY ALL** targets. You must explicitly configure allowed targets.
+
 ```bash
 # Simple host (defaults to port 22)
 export HEIDI_SSH_TARGETS="server.internal"
@@ -54,6 +56,19 @@ export HEIDI_SSH_TARGETS="localhost:2222"
 # Multiple targets
 export HEIDI_SSH_TARGETS="localhost:2222,192.168.1.100,server.internal"
 ```
+
+### SSH Backend (Phase 2)
+
+> **Note**: Currently ignored. Command execution returns NOT_IMPLEMENTED stub.
+
+| Value | Description |
+|-------|-------------|
+| (not set) | Returns NOT_IMPLEMENTED for exec |
+| `asyncssh` | Uses asyncssh for real SSH (Phase 2) |
+
+Future formats may include:
+- `http://host:port` - Remote proxy URL
+- `unix:/path/to/socket` - Unix socket proxy
 
 ## API Endpoints
 
@@ -145,6 +160,39 @@ Response:
     "is_active": true
   }
 ]
+```
+
+#### Get Status (No Auth Required)
+```http
+GET /api/connect/ssh/status
+```
+
+Response when disabled:
+```json
+{
+  "enabled": false,
+  "reason": "HEIDI_SSH_ENABLED is not set. Set HEIDI_SSH_ENABLED=1 to enable.",
+  "available_endpoints": []
+}
+```
+
+Response when enabled:
+```json
+{
+  "enabled": true,
+  "reason": null,
+  "bind_address": "127.0.0.1",
+  "target_allowlist_configured": true,
+  "validation_errors": [],
+  "available_endpoints": [
+    "POST /api/connect/ssh/sessions - Create session (STUB)",
+    "GET /api/connect/ssh/sessions - List sessions (STUB)",
+    "DELETE /api/connect/ssh/sessions/{id} - Close session (STUB)",
+    "POST /api/connect/ssh/sessions/{id}/exec - Execute command (STUB, requires asyncssh)",
+    "POST /api/connect/ssh/sessions/{id}/pty - Start PTY (STUB, Phase 2)",
+    "GET /api/connect/ssh/sessions/{id}/pty/{pty_id}/stream - PTY stream (STUB, Phase 2)"
+  ]
+}
 ```
 
 #### Get Config

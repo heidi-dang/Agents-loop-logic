@@ -117,9 +117,7 @@ def httpx_response_hook(span: Span, request: RequestInfo, response: ResponseInfo
 
     span.set_attribute(SpanAttributes.HTTP_STATUS_CODE, response.status_code)
     span.set_status(
-        StatusCode.ERROR
-        if response.status_code >= status.HTTP_400_BAD_REQUEST
-        else StatusCode.OK
+        StatusCode.ERROR if response.status_code >= status.HTTP_400_BAD_REQUEST else StatusCode.OK
     )
 
 
@@ -131,9 +129,7 @@ async def httpx_async_request_hook(span: Span, request: RequestInfo):
     httpx_request_hook(span, request)
 
 
-async def httpx_async_response_hook(
-    span: Span, request: RequestInfo, response: ResponseInfo
-):
+async def httpx_async_response_hook(span: Span, request: RequestInfo, response: ResponseInfo):
     """
     Async Response Hook
     """
@@ -190,9 +186,7 @@ class Instrumentor(BaseInstrumentor):
         instrument_fastapi(app=self.app)
         SQLAlchemyInstrumentor().instrument(engine=self.db_engine)
         RedisInstrumentor().instrument(request_hook=redis_request_hook)
-        RequestsInstrumentor().instrument(
-            request_hook=requests_hook, response_hook=response_hook
-        )
+        RequestsInstrumentor().instrument(request_hook=requests_hook, response_hook=response_hook)
         LoggingInstrumentor().instrument()
         HTTPXClientInstrumentor().instrument(
             request_hook=httpx_request_hook,

@@ -231,9 +231,7 @@ def downgrade() -> None:
         access_control = row[5]
 
         # Restore leading /
-        old_command = (
-            "/" + command if command and not command.startswith("/") else command
-        )
+        old_command = "/" + command if command and not command.startswith("/") else command
 
         conn.execute(
             sa.insert(old_prompt_table).values(

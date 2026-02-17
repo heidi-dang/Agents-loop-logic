@@ -160,9 +160,7 @@ def get_redis_client(async_mode=False):
     try:
         return get_redis_connection(
             redis_url=REDIS_URL,
-            redis_sentinels=get_sentinels_from_env(
-                REDIS_SENTINEL_HOSTS, REDIS_SENTINEL_PORT
-            ),
+            redis_sentinels=get_sentinels_from_env(REDIS_SENTINEL_HOSTS, REDIS_SENTINEL_PORT),
             redis_cluster=REDIS_CLUSTER,
             async_mode=async_mode,
         )
@@ -214,9 +212,7 @@ def get_redis_connection(
         elif redis_cluster:
             if not redis_url:
                 raise ValueError("Redis URL must be provided for cluster mode.")
-            return redis.cluster.RedisCluster.from_url(
-                redis_url, decode_responses=decode_responses
-            )
+            return redis.cluster.RedisCluster.from_url(redis_url, decode_responses=decode_responses)
         elif redis_url:
             connection = redis.from_url(redis_url, decode_responses=decode_responses)
     else:
@@ -241,13 +237,9 @@ def get_redis_connection(
         elif redis_cluster:
             if not redis_url:
                 raise ValueError("Redis URL must be provided for cluster mode.")
-            return redis.cluster.RedisCluster.from_url(
-                redis_url, decode_responses=decode_responses
-            )
+            return redis.cluster.RedisCluster.from_url(redis_url, decode_responses=decode_responses)
         elif redis_url:
-            connection = redis.Redis.from_url(
-                redis_url, decode_responses=decode_responses
-            )
+            connection = redis.Redis.from_url(redis_url, decode_responses=decode_responses)
 
     _CONNECTION_CACHE[cache_key] = connection
     return connection
@@ -268,7 +260,7 @@ def get_sentinel_url_from_env(redis_url, sentinel_hosts_env, sentinel_port_env):
     auth_part = ""
     if username or password:
         auth_part = f"{username}:{password}@"
-    hosts_part = ",".join(
-        f"{host}:{sentinel_port_env}" for host in sentinel_hosts_env.split(",")
+    hosts_part = ",".join(f"{host}:{sentinel_port_env}" for host in sentinel_hosts_env.split(","))
+    return (
+        f"redis+sentinel://{auth_part}{hosts_part}/{redis_config['db']}/{redis_config['service']}"
     )
-    return f"redis+sentinel://{auth_part}{hosts_part}/{redis_config['db']}/{redis_config['service']}"

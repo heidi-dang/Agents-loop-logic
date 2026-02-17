@@ -333,6 +333,43 @@ async def get_ssh_config(
     }
 
 
+@router.get("/status")
+async def get_ssh_status(
+    key: Optional[str] = None,
+):
+    """Get SSH connector status (no auth required for status check).
+
+    Returns:
+        Status info including enabled state and reason if disabled
+    """
+    enabled = is_ssh_enabled()
+
+    if not enabled:
+        return {
+            "enabled": False,
+            "reason": "HEIDI_SSH_ENABLED is not set. Set HEIDI_SSH_ENABLED=1 to enable.",
+            "available_endpoints": [],
+        }
+
+    errors = validate_config()
+
+    return {
+        "enabled": True,
+        "reason": None,
+        "bind_address": os.getenv("HEIDI_SSH_BIND", "127.0.0.1"),
+        "target_allowlist_configured": bool(os.getenv("HEIDI_SSH_TARGETS", "").strip()),
+        "validation_errors": errors,
+        "available_endpoints": [
+            "POST /api/connect/ssh/sessions - Create session (STUB)",
+            "GET /api/connect/ssh/sessions - List sessions (STUB)",
+            "DELETE /api/connect/ssh/sessions/{id} - Close session (STUB)",
+            "POST /api/connect/ssh/sessions/{id}/exec - Execute command (STUB, requires asyncssh)",
+            "POST /api/connect/ssh/sessions/{id}/pty - Start PTY (STUB, Phase 2)",
+            "GET /api/connect/ssh/sessions/{id}/pty/{pty_id}/stream - PTY stream (STUB, Phase 2)",
+        ],
+    }
+
+
 # PTY Streaming endpoints (Phase 2 - stubbed for future implementation)
 # These require a real SSH backend (asyncssh) to be fully functional
 

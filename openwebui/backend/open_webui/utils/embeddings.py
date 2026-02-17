@@ -1,10 +1,8 @@
-import random
 import logging
 import sys
 
 from fastapi import Request
 from open_webui.models.users import UserModel
-from open_webui.models.models import Models
 from open_webui.utils.models import check_model_access
 from open_webui.env import GLOBAL_LOG_LEVEL, BYPASS_MODEL_ACCESS_CONTROL
 

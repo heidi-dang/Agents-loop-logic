@@ -5,8 +5,6 @@ import socketio
 import logging
 import sys
 import time
-from typing import Dict, Set
-from redis import asyncio as aioredis
 import pycrdt as Y
 
 from open_webui.models.users import Users, UserNameResponse
@@ -23,7 +21,6 @@ from open_webui.config import (
 )
 
 from open_webui.env import (
-    VERSION,
     ENABLE_WEBSOCKET_SUPPORT,
     WEBSOCKET_MANAGER,
     WEBSOCKET_REDIS_URL,
@@ -68,9 +65,7 @@ if WEBSOCKET_MANAGER == "redis":
             redis_options=WEBSOCKET_REDIS_OPTIONS,
         )
     else:
-        mgr = socketio.AsyncRedisManager(
-            WEBSOCKET_REDIS_URL, redis_options=WEBSOCKET_REDIS_OPTIONS
-        )
+        mgr = socketio.AsyncRedisManager(WEBSOCKET_REDIS_URL, redis_options=WEBSOCKET_REDIS_OPTIONS)
     sio = socketio.AsyncServer(
         cors_allowed_origins=SOCKETIO_CORS_ORIGINS,
         async_mode="asgi",
@@ -106,16 +101,12 @@ if WEBSOCKET_MANAGER == "redis":
     log.debug("Using Redis to manage websockets.")
     REDIS = get_redis_connection(
         redis_url=WEBSOCKET_REDIS_URL,
-        redis_sentinels=get_sentinels_from_env(
-            WEBSOCKET_SENTINEL_HOSTS, WEBSOCKET_SENTINEL_PORT
-        ),
+        redis_sentinels=get_sentinels_from_env(WEBSOCKET_SENTINEL_HOSTS, WEBSOCKET_SENTINEL_PORT),
         redis_cluster=WEBSOCKET_REDIS_CLUSTER,
         async_mode=True,
     )
 
-    redis_sentinels = get_sentinels_from_env(
-        WEBSOCKET_SENTINEL_HOSTS, WEBSOCKET_SENTINEL_PORT
-    )
+    redis_sentinels = get_sentinels_from_env(WEBSOCKET_SENTINEL_HOSTS, WEBSOCKET_SENTINEL_PORT)
 
     MODELS = RedisDict(
         f"{REDIS_KEY_PREFIX}:models",
@@ -164,9 +155,7 @@ YDOC_MANAGER = YdocManager(
 
 async def periodic_usage_pool_cleanup():
     max_retries = 2
-    retry_delay = random.uniform(
-        WEBSOCKET_REDIS_LOCK_TIMEOUT / 2, WEBSOCKET_REDIS_LOCK_TIMEOUT
-    )
+    retry_delay = random.uniform(WEBSOCKET_REDIS_LOCK_TIMEOUT / 2, WEBSOCKET_REDIS_LOCK_TIMEOUT)
     for attempt in range(max_retries + 1):
         if aquire_func():
             break
@@ -177,20 +166,17 @@ async def periodic_usage_pool_cleanup():
                 )
                 await asyncio.sleep(retry_delay)
             else:
-                log.warning(
-                    "Failed to acquire cleanup lock after retries. Skipping cleanup."
-                )
+                log.warning("Failed to acquire cleanup lock after retries. Skipping cleanup.")
                 return
 
     log.debug("Running periodic_cleanup")
     try:
         while True:
             if not renew_func():
-                log.error(f"Unable to renew cleanup lock. Exiting usage pool cleanup.")
+                log.error("Unable to renew cleanup lock. Exiting usage pool cleanup.")
                 raise Exception("Unable to renew usage pool cleanup lock.")
 
             now = int(time.time())
-            send_usage = False
             for model_id, connections in list(USAGE_POOL.items()):
                 # Creating a list of sids to remove if they have timed out
                 expired_sids = [
@@ -208,7 +194,6 @@ async def periodic_usage_pool_cleanup():
                 else:
                     USAGE_POOL[model_id] = connections
 
-                send_usage = True
             await asyncio.sleep(TIMEOUT_DURATION)
     finally:
         release_func()
@@ -487,9 +472,7 @@ async def ydoc_document_join(sid, data):
                     permission="read",
                 )
             ):
-                log.error(
-                    f"User {user.get('id')} does not have access to note {note_id}"
-                )
+                log.error(f"User {user.get('id')} does not have access to note {note_id}")
                 return
 
         user_id = data.get("user_id", sid)
@@ -640,9 +623,7 @@ async def yjs_document_update(sid, data):
 
         async def debounced_save():
             await asyncio.sleep(0.5)
-            await document_save_handler(
-                document_id, data.get("data", {}), SESSION_POOL.get(sid)
-            )
+            await document_save_handler(document_id, data.get("data", {}), SESSION_POOL.get(sid))
 
         if data.get("data"):
             await create_task(REDIS, debounced_save(), document_id)
@@ -707,7 +688,7 @@ async def yjs_awareness_update(sid, data):
 @sio.event
 async def disconnect(sid):
     if sid in SESSION_POOL:
-        user = SESSION_POOL[sid]
+        SESSION_POOL[sid]
         del SESSION_POOL[sid]
         await YDOC_MANAGER.remove_user_from_all_documents(sid)
     else:
@@ -730,12 +711,7 @@ def get_event_emitter(request_info, update_db=True):
             },
             room=f"user:{user_id}",
         )
-        if (
-            update_db
-            and message_id
-            and not request_info.get("chat_id", "").startswith("local:")
-        ):
-
+        if update_db and message_id and not request_info.get("chat_id", "").startswith("local:"):
             if "type" in event_data and event_data["type"] == "status":
                 Chats.add_message_status_to_chat_by_id_and_message_id(
                     request_info["chat_id"],
@@ -808,7 +784,7 @@ def get_event_emitter(request_info, update_db=True):
 
             if event_data.get("type") in ["source", "citation"]:
                 data = event_data.get("data", {})
-                if data.get("type") == None:
+                if data.get("type") is None:
                     message = Chats.get_message_by_id_and_message_id(
                         request_info["chat_id"],
                         request_info["message_id"],
@@ -825,11 +801,7 @@ def get_event_emitter(request_info, update_db=True):
                         },
                     )
 
-    if (
-        "user_id" in request_info
-        and "chat_id" in request_info
-        and "message_id" in request_info
-    ):
+    if "user_id" in request_info and "chat_id" in request_info and "message_id" in request_info:
         return __event_emitter__
     else:
         return None
@@ -848,11 +820,7 @@ def get_event_call(request_info):
         )
         return response
 
-    if (
-        "session_id" in request_info
-        and "chat_id" in request_info
-        and "message_id" in request_info
-    ):
+    if "session_id" in request_info and "chat_id" in request_info and "message_id" in request_info:
         return __event_caller__
     else:
         return None

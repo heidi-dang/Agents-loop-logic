@@ -2,8 +2,7 @@ import json
 import uuid
 from open_webui.utils.redis import get_redis_connection
 from open_webui.env import REDIS_KEY_PREFIX
-from typing import Optional, List, Tuple
-import pycrdt as Y
+from typing import List
 
 
 class RedisLock:
@@ -36,9 +35,7 @@ class RedisLock:
 
     def renew_lock(self):
         # xx=True will only set this key if it _has_ already been set
-        return self.redis.set(
-            self.lock_name, self.lock_id, xx=True, ex=self.timeout_secs
-        )
+        return self.redis.set(self.lock_name, self.lock_id, xx=True, ex=self.timeout_secs)
 
     def release_lock(self):
         lock_value = self.redis.get(self.lock_name)
@@ -191,9 +188,7 @@ class YdocManager:
     async def remove_user_from_all_documents(self, user_id: str):
         if self._redis:
             keys = []
-            async for key in self._redis.scan_iter(
-                match=f"{self._redis_key_prefix}:*", count=100
-            ):
+            async for key in self._redis.scan_iter(match=f"{self._redis_key_prefix}:*", count=100):
                 keys.append(key)
             for key in keys:
                 if key.endswith(":users"):

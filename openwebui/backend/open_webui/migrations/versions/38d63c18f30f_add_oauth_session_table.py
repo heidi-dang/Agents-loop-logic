@@ -64,9 +64,7 @@ def upgrade() -> None:
     # Create indexes for better performance
     op.create_index("idx_oauth_session_user_id", "oauth_session", ["user_id"])
     op.create_index("idx_oauth_session_expires_at", "oauth_session", ["expires_at"])
-    op.create_index(
-        "idx_oauth_session_user_provider", "oauth_session", ["user_id", "provider"]
-    )
+    op.create_index("idx_oauth_session_user_provider", "oauth_session", ["user_id", "provider"])
 
 
 def downgrade() -> None:

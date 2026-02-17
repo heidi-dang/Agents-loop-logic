@@ -65,9 +65,9 @@ class InterceptHandler(logging.Handler):
             frame = frame.f_back
             depth += 1
 
-        logger.opt(depth=depth, exception=record.exc_info).bind(
-            **self._get_extras()
-        ).log(level, record.getMessage())
+        logger.opt(depth=depth, exception=record.exc_info).bind(**self._get_extras()).log(
+            level, record.getMessage()
+        )
         if ENABLE_OTEL and ENABLE_OTEL_LOGS:
             from open_webui.utils.telemetry.logs import otel_handler
 
@@ -131,9 +131,7 @@ def start_logger():
         sys.stdout,
         level=GLOBAL_LOG_LEVEL,
         format=stdout_format,
-        filter=lambda record: (
-            "auditable" not in record["extra"] if ENABLE_AUDIT_STDOUT else True
-        ),
+        filter=lambda record: "auditable" not in record["extra"] if ENABLE_AUDIT_STDOUT else True,
     )
     if AUDIT_LOG_LEVEL != "NONE" and ENABLE_AUDIT_LOGS_FILE:
         try:
@@ -148,9 +146,7 @@ def start_logger():
         except Exception as e:
             logger.error(f"Failed to initialize audit log file handler: {str(e)}")
 
-    logging.basicConfig(
-        handlers=[InterceptHandler()], level=GLOBAL_LOG_LEVEL, force=True
-    )
+    logging.basicConfig(handlers=[InterceptHandler()], level=GLOBAL_LOG_LEVEL, force=True)
 
     for uvicorn_logger_name in ["uvicorn", "uvicorn.error"]:
         uvicorn_logger = logging.getLogger(uvicorn_logger_name)

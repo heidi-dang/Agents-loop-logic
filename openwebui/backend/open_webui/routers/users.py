@@ -21,7 +21,6 @@ from open_webui.models.users import (
     UserGroupIdsListResponse,
     UserInfoResponse,
     UserInfoListResponse,
-    UserRoleUpdateForm,
     UserStatus,
     Users,
     UserSettings,
@@ -140,9 +139,7 @@ async def search_users(
 
 
 @router.get("/groups")
-async def get_user_groups(
-    user=Depends(get_verified_user), db: Session = Depends(get_session)
-):
+async def get_user_groups(user=Depends(get_verified_user), db: Session = Depends(get_session)):
     return Groups.get_groups_by_member_id(user.id, db=db)
 
 
@@ -157,9 +154,7 @@ async def get_user_permissisions(
     user=Depends(get_verified_user),
     db: Session = Depends(get_session),
 ):
-    user_permissions = get_permissions(
-        user.id, request.app.state.config.USER_PERMISSIONS, db=db
-    )
+    user_permissions = get_permissions(user.id, request.app.state.config.USER_PERMISSIONS, db=db)
 
     return user_permissions
 
@@ -250,9 +245,7 @@ async def get_default_user_permissions(request: Request, user=Depends(get_admin_
         "sharing": SharingPermissions(
             **request.app.state.config.USER_PERMISSIONS.get("sharing", {})
         ),
-        "chat": ChatPermissions(
-            **request.app.state.config.USER_PERMISSIONS.get("chat", {})
-        ),
+        "chat": ChatPermissions(**request.app.state.config.USER_PERMISSIONS.get("chat", {})),
         "features": FeaturesPermissions(
             **request.app.state.config.USER_PERMISSIONS.get("features", {})
         ),
@@ -413,9 +406,7 @@ async def update_user_info_by_session_user(
         if user.info is None:
             user.info = {}
 
-        user = Users.update_user_by_id(
-            user.id, {"info": {**user.info, **form_data}}, db=db
-        )
+        user = Users.update_user_by_id(user.id, {"info": {**user.info, **form_data}}, db=db)
         if user:
             return user.info
         else:
@@ -541,7 +532,7 @@ def get_user_profile_image_by_id(user_id: str, user=Depends(get_verified_user)):
                         media_type=media_type,
                         headers={"Content-Disposition": "inline"},
                     )
-                except Exception as e:
+                except Exception:
                     pass
         return FileResponse(f"{STATIC_DIR}/user.png")
     else:

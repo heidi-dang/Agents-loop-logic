@@ -150,7 +150,7 @@ class TestUsers(AbstractPostgresTest):
             role="admin",
             name="user 2 updated",
             email="user2-updated@openwebui.com",
-            profile_image_url=f"/api/v1/users/2/profile/image",
+            profile_image_url="/api/v1/users/2/profile/image",
         )
 
         # Delete user by id

@@ -5,10 +5,7 @@ from contextlib import AsyncExitStack
 import anyio
 
 from mcp import ClientSession
-from mcp.client.auth import OAuthClientProvider, TokenStorage
 from mcp.client.streamable_http import streamablehttp_client
-from mcp.shared.auth import OAuthClientInformationFull, OAuthClientMetadata, OAuthToken
-import httpx
 from mcp.shared._httpx_utils import create_mcp_http_client
 from open_webui.env import AIOHTTP_CLIENT_SESSION_TOOL_SERVER_SSL
 
@@ -39,13 +36,9 @@ class MCPClient:
                 transport = await exit_stack.enter_async_context(self._streams_context)
                 read_stream, write_stream, _ = transport
 
-                self._session_context = ClientSession(
-                    read_stream, write_stream
-                )  # pylint: disable=W0201
+                self._session_context = ClientSession(read_stream, write_stream)  # pylint: disable=W0201
 
-                self.session = await exit_stack.enter_async_context(
-                    self._session_context
-                )
+                self.session = await exit_stack.enter_async_context(self._session_context)
                 with anyio.fail_after(10):
                     await self.session.initialize()
                 self.exit_stack = exit_stack.pop_all()
@@ -68,17 +61,13 @@ class MCPClient:
             inputSchema = tool.inputSchema
 
             # TODO: handle outputSchema if needed
-            outputSchema = getattr(tool, "outputSchema", None)
+            getattr(tool, "outputSchema", None)
 
-            tool_specs.append(
-                {"name": name, "description": description, "parameters": inputSchema}
-            )
+            tool_specs.append({"name": name, "description": description, "parameters": inputSchema})
 
         return tool_specs
 
-    async def call_tool(
-        self, function_name: str, function_args: dict
-    ) -> Optional[dict]:
+    async def call_tool(self, function_name: str, function_args: dict) -> Optional[dict]:
         if not self.session:
             raise RuntimeError("MCP client is not connected.")
 

@@ -8,7 +8,7 @@ Create Date: 2024-10-09 21:02:35.241684
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.sql import table, select, update
+from sqlalchemy.sql import table, select
 
 import json
 
@@ -38,9 +38,7 @@ def upgrade():
 
             # Step 1: Rename current 'chat' column to 'old_chat'
             print("Renaming 'chat' column to 'old_chat'")
-            op.alter_column(
-                "chat", "chat", new_column_name="old_chat", existing_type=sa.Text()
-            )
+            op.alter_column("chat", "chat", new_column_name="old_chat", existing_type=sa.Text())
 
             # Step 2: Add new 'chat' column of type JSON
             print("Adding new 'chat' column of type JSON")
@@ -68,9 +66,7 @@ def upgrade():
             json_data = None  # Handle cases where the text cannot be converted to JSON
 
         connection.execute(
-            sa.update(chat_table)
-            .where(chat_table.c.id == row.id)
-            .values(chat=json_data)
+            sa.update(chat_table).where(chat_table.c.id == row.id).values(chat=json_data)
         )
 
     # Step 4: Drop 'old_chat' column
@@ -95,9 +91,7 @@ def downgrade():
     for row in results:
         text_data = json.dumps(row.chat) if row.chat is not None else None
         connection.execute(
-            sa.update(chat_table)
-            .where(chat_table.c.id == row.id)
-            .values(old_chat=text_data)
+            sa.update(chat_table).where(chat_table.c.id == row.id).values(old_chat=text_data)
         )
 
     # Step 3: Remove the new 'chat' JSON column

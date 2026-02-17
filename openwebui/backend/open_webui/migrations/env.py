@@ -65,9 +65,7 @@ def run_migrations_online() -> None:
     # Handle SQLCipher URLs
     if DB_URL and DB_URL.startswith("sqlite+sqlcipher://"):
         if not DATABASE_PASSWORD or DATABASE_PASSWORD.strip() == "":
-            raise ValueError(
-                "DATABASE_PASSWORD is required when using sqlite+sqlcipher:// URLs"
-            )
+            raise ValueError("DATABASE_PASSWORD is required when using sqlite+sqlcipher:// URLs")
 
         # Extract database path from SQLCipher URL
         db_path = DB_URL.replace("sqlite+sqlcipher://", "")

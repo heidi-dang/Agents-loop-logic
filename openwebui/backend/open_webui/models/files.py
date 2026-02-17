@@ -3,7 +3,7 @@ import time
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from open_webui.internal.db import Base, JSONField, get_db, get_db_context
+from open_webui.internal.db import Base, get_db_context
 from pydantic import BaseModel, ConfigDict, model_validator
 from sqlalchemy import BigInteger, Column, String, Text, JSON
 
@@ -149,9 +149,7 @@ class FilesTable:
                 log.exception(f"Error inserting a new file: {e}")
                 return None
 
-    def get_file_by_id(
-        self, id: str, db: Optional[Session] = None
-    ) -> Optional[FileModel]:
+    def get_file_by_id(self, id: str, db: Optional[Session] = None) -> Optional[FileModel]:
         try:
             with get_db_context(db) as db:
                 try:
@@ -206,9 +204,7 @@ class FilesTable:
         # Implement additional access control logic here as needed
         return False
 
-    def get_files_by_ids(
-        self, ids: list[str], db: Optional[Session] = None
-    ) -> list[FileModel]:
+    def get_files_by_ids(self, ids: list[str], db: Optional[Session] = None) -> list[FileModel]:
         with get_db_context(db) as db:
             return [
                 FileModel.model_validate(file)
@@ -238,9 +234,7 @@ class FilesTable:
                 .all()
             ]
 
-    def get_files_by_user_id(
-        self, user_id: str, db: Optional[Session] = None
-    ) -> list[FileModel]:
+    def get_files_by_user_id(self, user_id: str, db: Optional[Session] = None) -> list[FileModel]:
         with get_db_context(db) as db:
             return [
                 FileModel.model_validate(file)
@@ -303,10 +297,7 @@ class FilesTable:
 
             return [
                 FileModel.model_validate(file)
-                for file in query.order_by(File.updated_at.desc())
-                .offset(skip)
-                .limit(limit)
-                .all()
+                for file in query.order_by(File.updated_at.desc()).offset(skip).limit(limit).all()
             ]
 
     def update_file_by_id(
@@ -356,8 +347,7 @@ class FilesTable:
                 file.updated_at = int(time.time())
                 db.commit()
                 return FileModel.model_validate(file)
-            except Exception as e:
-
+            except Exception:
                 return None
 
     def update_file_metadata_by_id(

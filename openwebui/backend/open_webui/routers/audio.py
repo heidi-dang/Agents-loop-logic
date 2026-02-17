@@ -7,11 +7,9 @@ import html
 import base64
 from functools import lru_cache
 from pydub import AudioSegment
-from pydub.silence import split_on_silence
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
-from fnmatch import fnmatch
 import aiohttp
 import aiofiles
 import requests
@@ -19,7 +17,6 @@ import mimetypes
 
 from fastapi import (
     Depends,
-    FastAPI,
     File,
     Form,
     HTTPException,
@@ -28,7 +25,6 @@ from fastapi import (
     status,
     APIRouter,
 )
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -50,7 +46,6 @@ from open_webui.config import (
 
 from open_webui.constants import ERROR_MESSAGES
 from open_webui.env import (
-    ENV,
     AIOHTTP_CLIENT_SESSION_SSL,
     AIOHTTP_CLIENT_TIMEOUT,
     AIOHTTP_CLIENT_TIMEOUT_MODEL_LIST,
@@ -78,7 +73,6 @@ SPEECH_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 #
 ##########################################
 
-from pydub import AudioSegment
 from pydub.utils import mediainfo
 
 
@@ -242,9 +236,7 @@ async def update_audio_config(
     request.app.state.config.TTS_VOICE = form_data.tts.VOICE
     request.app.state.config.TTS_SPLIT_ON = form_data.tts.SPLIT_ON
     request.app.state.config.TTS_AZURE_SPEECH_REGION = form_data.tts.AZURE_SPEECH_REGION
-    request.app.state.config.TTS_AZURE_SPEECH_BASE_URL = (
-        form_data.tts.AZURE_SPEECH_BASE_URL
-    )
+    request.app.state.config.TTS_AZURE_SPEECH_BASE_URL = form_data.tts.AZURE_SPEECH_BASE_URL
     request.app.state.config.TTS_AZURE_SPEECH_OUTPUT_FORMAT = (
         form_data.tts.AZURE_SPEECH_OUTPUT_FORMAT
     )
@@ -253,9 +245,7 @@ async def update_audio_config(
     request.app.state.config.STT_OPENAI_API_KEY = form_data.stt.OPENAI_API_KEY
     request.app.state.config.STT_ENGINE = form_data.stt.ENGINE
     request.app.state.config.STT_MODEL = form_data.stt.MODEL
-    request.app.state.config.STT_SUPPORTED_CONTENT_TYPES = (
-        form_data.stt.SUPPORTED_CONTENT_TYPES
-    )
+    request.app.state.config.STT_SUPPORTED_CONTENT_TYPES = form_data.stt.SUPPORTED_CONTENT_TYPES
 
     request.app.state.config.WHISPER_MODEL = form_data.stt.WHISPER_MODEL
     request.app.state.config.DEEPGRAM_API_KEY = form_data.stt.DEEPGRAM_API_KEY
@@ -263,13 +253,9 @@ async def update_audio_config(
     request.app.state.config.AUDIO_STT_AZURE_REGION = form_data.stt.AZURE_REGION
     request.app.state.config.AUDIO_STT_AZURE_LOCALES = form_data.stt.AZURE_LOCALES
     request.app.state.config.AUDIO_STT_AZURE_BASE_URL = form_data.stt.AZURE_BASE_URL
-    request.app.state.config.AUDIO_STT_AZURE_MAX_SPEAKERS = (
-        form_data.stt.AZURE_MAX_SPEAKERS
-    )
+    request.app.state.config.AUDIO_STT_AZURE_MAX_SPEAKERS = form_data.stt.AZURE_MAX_SPEAKERS
     request.app.state.config.AUDIO_STT_MISTRAL_API_KEY = form_data.stt.MISTRAL_API_KEY
-    request.app.state.config.AUDIO_STT_MISTRAL_API_BASE_URL = (
-        form_data.stt.MISTRAL_API_BASE_URL
-    )
+    request.app.state.config.AUDIO_STT_MISTRAL_API_BASE_URL = form_data.stt.MISTRAL_API_BASE_URL
     request.app.state.config.AUDIO_STT_MISTRAL_USE_CHAT_COMPLETIONS = (
         form_data.stt.MISTRAL_USE_CHAT_COMPLETIONS
     )
@@ -320,9 +306,7 @@ def load_speech_pipeline(request):
     from datasets import load_dataset
 
     if request.app.state.speech_synthesiser is None:
-        request.app.state.speech_synthesiser = pipeline(
-            "text-to-speech", "microsoft/speecht5_tts"
-        )
+        request.app.state.speech_synthesiser = pipeline("text-to-speech", "microsoft/speecht5_tts")
 
     if request.app.state.speech_speaker_embeddings_dataset is None:
         request.app.state.speech_speaker_embeddings_dataset = load_dataset(
@@ -373,9 +357,7 @@ async def speech(request: Request, user=Depends(get_verified_user)):
 
         try:
             timeout = aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT)
-            async with aiohttp.ClientSession(
-                timeout=timeout, trust_env=True
-            ) as session:
+            async with aiohttp.ClientSession(timeout=timeout, trust_env=True) as session:
                 payload = {
                     **payload,
                     **(request.app.state.config.TTS_OPENAI_PARAMS or {}),
@@ -410,7 +392,7 @@ async def speech(request: Request, user=Depends(get_verified_user)):
             detail = None
 
             status_code = 500
-            detail = f"Open WebUI: Server Connection Error"
+            detail = "Open WebUI: Server Connection Error"
 
             if r is not None:
                 status_code = r.status
@@ -438,9 +420,7 @@ async def speech(request: Request, user=Depends(get_verified_user)):
 
         try:
             timeout = aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT)
-            async with aiohttp.ClientSession(
-                timeout=timeout, trust_env=True
-            ) as session:
+            async with aiohttp.ClientSession(timeout=timeout, trust_env=True) as session:
                 async with session.post(
                     f"{ELEVENLABS_API_BASE_URL}/v1/text-to-speech/{voice_id}",
                     json={
@@ -500,9 +480,7 @@ async def speech(request: Request, user=Depends(get_verified_user)):
                 <voice name="{language}">{html.escape(payload["input"])}</voice>
             </speak>"""
             timeout = aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT)
-            async with aiohttp.ClientSession(
-                timeout=timeout, trust_env=True
-            ) as session:
+            async with aiohttp.ClientSession(timeout=timeout, trust_env=True) as session:
                 async with session.post(
                     (base_url or f"https://{region}.tts.speech.microsoft.com")
                     + "/cognitiveservices/v1",
@@ -558,15 +536,11 @@ async def speech(request: Request, user=Depends(get_verified_user)):
 
         speaker_index = 6799
         try:
-            speaker_index = embeddings_dataset["filename"].index(
-                request.app.state.config.TTS_MODEL
-            )
+            speaker_index = embeddings_dataset["filename"].index(request.app.state.config.TTS_MODEL)
         except Exception:
             pass
 
-        speaker_embedding = torch.tensor(
-            embeddings_dataset[speaker_index]["xvector"]
-        ).unsqueeze(0)
+        speaker_embedding = torch.tensor(embeddings_dataset[speaker_index]["xvector"]).unsqueeze(0)
 
         speech = request.app.state.speech_synthesiser(
             payload["input"],
@@ -633,9 +607,7 @@ def transcription_handler(request, file_path, metadata, user=None):
                 if language:
                     payload["language"] = language
 
-                headers = {
-                    "Authorization": f"Bearer {request.app.state.config.STT_OPENAI_API_KEY}"
-                }
+                headers = {"Authorization": f"Bearer {request.app.state.config.STT_OPENAI_API_KEY}"}
                 if user and ENABLE_FORWARD_USER_INFO_HEADERS:
                     headers = include_user_info_headers(headers, user)
 
@@ -717,14 +689,12 @@ def transcription_handler(request, file_path, metadata, user=None):
 
             # Extract transcript from Deepgram response
             try:
-                transcript = response_data["results"]["channels"][0]["alternatives"][
-                    0
-                ].get("transcript", "")
+                transcript = response_data["results"]["channels"][0]["alternatives"][0].get(
+                    "transcript", ""
+                )
             except (KeyError, IndexError) as e:
                 log.error(f"Malformed response from Deepgram: {str(e)}")
-                raise Exception(
-                    "Failed to parse Deepgram response - unexpected response format"
-                )
+                raise Exception("Failed to parse Deepgram response - unexpected response format")
             data = {"text": transcript.strip()}
 
             # Save transcript
@@ -880,12 +850,9 @@ def transcription_handler(request, file_path, metadata, user=None):
 
         api_key = request.app.state.config.AUDIO_STT_MISTRAL_API_KEY
         api_base_url = (
-            request.app.state.config.AUDIO_STT_MISTRAL_API_BASE_URL
-            or "https://api.mistral.ai/v1"
+            request.app.state.config.AUDIO_STT_MISTRAL_API_BASE_URL or "https://api.mistral.ai/v1"
         )
-        use_chat_completions = (
-            request.app.state.config.AUDIO_STT_MISTRAL_USE_CHAT_COMPLETIONS
-        )
+        use_chat_completions = request.app.state.config.AUDIO_STT_MISTRAL_USE_CHAT_COMPLETIONS
 
         if not api_key:
             raise HTTPException(
@@ -965,10 +932,7 @@ def transcription_handler(request, file_path, metadata, user=None):
 
                 # Extract transcript from chat completion response
                 transcript = (
-                    response.get("choices", [{}])[0]
-                    .get("message", {})
-                    .get("content", "")
-                    .strip()
+                    response.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
                 )
                 if not transcript:
                     raise ValueError("Empty transcript in response")
@@ -1048,9 +1012,7 @@ def transcription_handler(request, file_path, metadata, user=None):
             )
 
 
-def transcribe(
-    request: Request, file_path: str, metadata: Optional[dict] = None, user=None
-):
+def transcribe(request: Request, file_path: str, metadata: Optional[dict] = None, user=None):
     log.info(f"transcribe: {file_path} {metadata}")
 
     if is_audio_conversion_required(file_path):
@@ -1077,9 +1039,7 @@ def transcribe(
         with ThreadPoolExecutor() as executor:
             # Submit tasks for each chunk_path
             futures = [
-                executor.submit(
-                    transcription_handler, request, chunk_path, metadata, user
-                )
+                executor.submit(transcription_handler, request, chunk_path, metadata, user)
                 for chunk_path in chunk_paths
             ]
             # Gather results as they complete
@@ -1107,9 +1067,7 @@ def transcribe(
 
 def compress_audio(file_path):
     if os.path.getsize(file_path) > MAX_FILE_SIZE:
-        id = os.path.splitext(os.path.basename(file_path))[
-            0
-        ]  # Handles names with multiple dots
+        id = os.path.splitext(os.path.basename(file_path))[0]  # Handles names with multiple dots
         file_dir = os.path.dirname(file_path)
 
         audio = AudioSegment.from_file(file_path)
@@ -1320,9 +1278,7 @@ def get_available_voices(request) -> dict:
             }
     elif request.app.state.config.TTS_ENGINE == "elevenlabs":
         try:
-            available_voices = get_elevenlabs_voices(
-                api_key=request.app.state.config.TTS_API_KEY
-            )
+            available_voices = get_elevenlabs_voices(api_key=request.app.state.config.TTS_API_KEY)
         except Exception:
             # Avoided @lru_cache with exception
             pass
@@ -1333,13 +1289,9 @@ def get_available_voices(request) -> dict:
             url = (
                 base_url or f"https://{region}.tts.speech.microsoft.com"
             ) + "/cognitiveservices/voices/list"
-            headers = {
-                "Ocp-Apim-Subscription-Key": request.app.state.config.TTS_API_KEY
-            }
+            headers = {"Ocp-Apim-Subscription-Key": request.app.state.config.TTS_API_KEY}
 
-            response = requests.get(
-                url, headers=headers, timeout=AIOHTTP_CLIENT_TIMEOUT_MODEL_LIST
-            )
+            response = requests.get(url, headers=headers, timeout=AIOHTTP_CLIENT_TIMEOUT_MODEL_LIST)
             response.raise_for_status()
             voices = response.json()
 
@@ -1389,8 +1341,4 @@ def get_elevenlabs_voices(api_key: str) -> dict:
 
 @router.get("/voices")
 async def get_voices(request: Request, user=Depends(get_verified_user)):
-    return {
-        "voices": [
-            {"id": k, "name": v} for k, v in get_available_voices(request).items()
-        ]
-    }
+    return {"voices": [{"id": k, "name": v} for k, v in get_available_voices(request).items()]}

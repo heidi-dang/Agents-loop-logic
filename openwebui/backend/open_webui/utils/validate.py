@@ -33,6 +33,4 @@ def validate_profile_image_url(url: str) -> str:
     if url in _ALLOWED_STATIC_PATHS:
         return url
 
-    raise ValueError(
-        "Invalid profile image URL: only data URIs and default avatars are allowed."
-    )
+    raise ValueError("Invalid profile image URL: only data URIs and default avatars are allowed.")

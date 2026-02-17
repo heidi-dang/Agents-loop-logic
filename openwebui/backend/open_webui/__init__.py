@@ -23,9 +23,7 @@ def version_callback(value: bool):
 
 @app.command()
 def main(
-    version: Annotated[
-        Optional[bool], typer.Option("--version", callback=version_callback)
-    ] = None,
+    version: Annotated[Optional[bool], typer.Option("--version", callback=version_callback)] = None,
 ):
     pass
 
@@ -37,9 +35,7 @@ def serve(
 ):
     os.environ["FROM_INIT_PY"] = "true"
     if os.getenv("WEBUI_SECRET_KEY") is None:
-        typer.echo(
-            "Loading WEBUI_SECRET_KEY from file, not provided as an environment variable."
-        )
+        typer.echo("Loading WEBUI_SECRET_KEY from file, not provided as an environment variable.")
         if not KEY_FILE.exists():
             typer.echo(f"Generating a new secret key and saving it to {KEY_FILE}")
             KEY_FILE.write_bytes(base64.b64encode(random.randbytes(12)))

@@ -1,6 +1,5 @@
-from elasticsearch import Elasticsearch, BadRequestError
+from elasticsearch import Elasticsearch
 from typing import Optional
-import ssl
 from elasticsearch.helpers import bulk, scan
 
 from open_webui.retrieval.vector.utils import process_metadata
@@ -136,15 +135,13 @@ class ElasticsearchClient(VectorDBBase):
     # Status: works
     def has_collection(self, collection_name) -> bool:
         query_body = {"query": {"bool": {"filter": []}}}
-        query_body["query"]["bool"]["filter"].append(
-            {"term": {"collection": collection_name}}
-        )
+        query_body["query"]["bool"]["filter"].append({"term": {"collection": collection_name}})
 
         try:
             result = self.client.count(index=f"{self.index_prefix}*", body=query_body)
 
             return result.body["count"] > 0
-        except Exception as e:
+        except Exception:
             return None
 
     def delete_collection(self, collection_name: str):
@@ -164,22 +161,16 @@ class ElasticsearchClient(VectorDBBase):
             "_source": ["text", "metadata"],
             "query": {
                 "script_score": {
-                    "query": {
-                        "bool": {"filter": [{"term": {"collection": collection_name}}]}
-                    },
+                    "query": {"bool": {"filter": [{"term": {"collection": collection_name}}]}},
                     "script": {
                         "source": "cosineSimilarity(params.vector, 'vector') + 1.0",
-                        "params": {
-                            "vector": vectors[0]
-                        },  # Assuming single query vector
+                        "params": {"vector": vectors[0]},  # Assuming single query vector
                     },
                 }
             },
         }
 
-        result = self.client.search(
-            index=self._get_index_name(len(vectors[0])), body=query
-        )
+        result = self.client.search(index=self._get_index_name(len(vectors[0])), body=query)
 
         return self._result_to_search_result(result)
 
@@ -197,9 +188,7 @@ class ElasticsearchClient(VectorDBBase):
 
         for field, value in filter.items():
             query_body["query"]["bool"]["filter"].append({"term": {field: value}})
-        query_body["query"]["bool"]["filter"].append(
-            {"term": {"collection": collection_name}}
-        )
+        query_body["query"]["bool"]["filter"].append({"term": {"collection": collection_name}})
         size = limit if limit else 10
 
         try:
@@ -211,14 +200,12 @@ class ElasticsearchClient(VectorDBBase):
 
             return self._result_to_get_result(result)
 
-        except Exception as e:
+        except Exception:
             return None
 
     # Status: works
     def _has_index(self, dimension: int):
-        return self.client.indices.exists(
-            index=self._get_index_name(dimension=dimension)
-        )
+        return self.client.indices.exists(index=self._get_index_name(dimension=dimension))
 
     def get_or_create_index(self, dimension: int):
         if not self._has_index(dimension=dimension):
@@ -286,17 +273,13 @@ class ElasticsearchClient(VectorDBBase):
         filter: Optional[dict] = None,
     ):
 
-        query = {
-            "query": {"bool": {"filter": [{"term": {"collection": collection_name}}]}}
-        }
+        query = {"query": {"bool": {"filter": [{"term": {"collection": collection_name}}]}}}
         # logic based on chromaDB
         if ids:
             query["query"]["bool"]["filter"].append({"terms": {"_id": ids}})
         elif filter:
             for field, value in filter.items():
-                query["query"]["bool"]["filter"].append(
-                    {"term": {f"metadata.{field}": value}}
-                )
+                query["query"]["bool"]["filter"].append({"term": {f"metadata.{field}": value}})
 
         self.client.delete_by_query(index=f"{self.index_prefix}*", body=query)
 

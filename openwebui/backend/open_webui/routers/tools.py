@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 from typing import Optional
 import time
 import re
@@ -12,7 +11,6 @@ from sqlalchemy.orm import Session
 from open_webui.internal.db import get_session
 
 
-from open_webui.models.oauth_sessions import OAuthSessions
 from open_webui.models.tools import (
     ToolForm,
     ToolModel,
@@ -78,9 +76,7 @@ async def get_tools(
     # OpenAPI Tool Servers
     server_access_grants = {}
     for server in await get_tool_servers(request):
-        connection = request.app.state.config.TOOL_SERVER_CONNECTIONS[
-            server.get("idx", 0)
-        ]
+        connection = request.app.state.config.TOOL_SERVER_CONNECTIONS[server.get("idx", 0)]
         server_config = connection.get("config", {})
 
         server_id = f"server:{server.get('id')}"
@@ -91,9 +87,7 @@ async def get_tools(
                 **{
                     "id": server_id,
                     "user_id": server_id,
-                    "name": server.get("openapi", {})
-                    .get("info", {})
-                    .get("title", "Tool Server"),
+                    "name": server.get("openapi", {}).get("info", {}).get("title", "Tool Server"),
                     "meta": {
                         "description": server.get("openapi", {})
                         .get("info", {})
@@ -116,10 +110,8 @@ async def get_tools(
                 splits = server_id.split(":")
                 server_id = splits[-1] if len(splits) > 1 else server_id
 
-                session_token = (
-                    await request.app.state.oauth_client_manager.get_oauth_token(
-                        user.id, f"mcp:{server_id}"
-                    )
+                session_token = await request.app.state.oauth_client_manager.get_oauth_token(
+                    user.id, f"mcp:{server_id}"
                 )
 
             server_config = server.get("config", {})
@@ -134,9 +126,7 @@ async def get_tools(
                         "user_id": tool_id,
                         "name": server.get("info", {}).get("name", "MCP Tool Server"),
                         "meta": {
-                            "description": server.get("info", {}).get(
-                                "description", ""
-                            ),
+                            "description": server.get("info", {}).get("description", ""),
                         },
                         "updated_at": int(time.time()),
                         "created_at": int(time.time()),
@@ -155,9 +145,7 @@ async def get_tools(
         # Admin can see all tools
         return tools
     else:
-        user_group_ids = {
-            group.id for group in Groups.get_groups_by_member_id(user.id, db=db)
-        }
+        user_group_ids = {group.id for group in Groups.get_groups_by_member_id(user.id, db=db)}
         tools = [
             tool
             for tool in tools
@@ -190,9 +178,7 @@ async def get_tools(
 
 
 @router.get("/list", response_model=list[ToolAccessResponse])
-async def get_tool_list(
-    user=Depends(get_verified_user), db: Session = Depends(get_session)
-):
+async def get_tool_list(user=Depends(get_verified_user), db: Session = Depends(get_session)):
     if user.role == "admin" and BYPASS_ADMIN_ACCESS_CONTROL:
         tools = Tools.get_tools(db=db)
     else:
@@ -237,9 +223,7 @@ def github_url_to_raw_url(url: str) -> str:
     m2 = re.match(r"https://github\.com/([^/]+)/([^/]+)/blob/([^/]+)/(.*)", url)
     if m2:
         org, repo, branch, path = m2.groups()
-        return (
-            f"https://raw.githubusercontent.com/{org}/{repo}/refs/heads/{branch}/{path}"
-        )
+        return f"https://raw.githubusercontent.com/{org}/{repo}/refs/heads/{branch}/{path}"
 
     # No match; return as-is
     return url
@@ -267,25 +251,21 @@ async def load_tool_from_url(
             file_name.endswith(".py")
             and (not file_name.startswith(("main.py", "index.py", "__init__.py")))
         )
-        else url_parts[-2] if len(url_parts) > 1 else "function"
+        else url_parts[-2]
+        if len(url_parts) > 1
+        else "function"
     )
 
     try:
         async with aiohttp.ClientSession(
             trust_env=True, timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT)
         ) as session:
-            async with session.get(
-                url, headers={"Content-Type": "application/json"}
-            ) as resp:
+            async with session.get(url, headers={"Content-Type": "application/json"}) as resp:
                 if resp.status != 200:
-                    raise HTTPException(
-                        status_code=resp.status, detail="Failed to fetch the tool"
-                    )
+                    raise HTTPException(status_code=resp.status, detail="Failed to fetch the tool")
                 data = await resp.text()
                 if not data:
-                    raise HTTPException(
-                        status_code=400, detail="No data received from the URL"
-                    )
+                    raise HTTPException(status_code=400, detail="No data received from the URL")
         return {
             "name": tool_name,
             "content": data,
@@ -335,9 +315,7 @@ async def create_new_tools(
     db: Session = Depends(get_session),
 ):
     if user.role != "admin" and not (
-        has_permission(
-            user.id, "workspace.tools", request.app.state.config.USER_PERMISSIONS, db=db
-        )
+        has_permission(user.id, "workspace.tools", request.app.state.config.USER_PERMISSIONS, db=db)
         or has_permission(
             user.id,
             "workspace.tools_import",
@@ -568,10 +546,7 @@ async def update_tool_access_by_id(
         form_data.access_grants = [
             grant
             for grant in form_data.access_grants
-            if not (
-                grant.get("principal_type") == "user"
-                and grant.get("principal_id") == "*"
-            )
+            if not (grant.get("principal_type") == "user" and grant.get("principal_id") == "*")
         ]
 
     AccessGrants.set_access_grants("tool", id, form_data.access_grants, db=db)
@@ -825,9 +800,7 @@ async def update_tools_user_valves_by_id(
                 form_data = {k: v for k, v in form_data.items() if v is not None}
                 user_valves = UserValves(**form_data)
                 user_valves_dict = user_valves.model_dump(exclude_unset=True)
-                Tools.update_user_valves_by_id_and_user_id(
-                    id, user.id, user_valves_dict, db=db
-                )
+                Tools.update_user_valves_by_id_and_user_id(id, user.id, user_valves_dict, db=db)
                 return user_valves_dict
             except Exception as e:
                 log.exception(f"Failed to update user valves by id {id}: {e}")

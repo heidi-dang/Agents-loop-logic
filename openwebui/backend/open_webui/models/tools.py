@@ -3,7 +3,7 @@ import time
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from open_webui.internal.db import Base, JSONField, get_db, get_db_context
+from open_webui.internal.db import Base, JSONField, get_db_context
 from open_webui.models.users import Users, UserResponse
 from open_webui.models.groups import Groups
 from open_webui.models.access_grants import AccessGrantModel, AccessGrants
@@ -126,9 +126,7 @@ class ToolsTable:
                 db.add(result)
                 db.commit()
                 db.refresh(result)
-                AccessGrants.set_access_grants(
-                    "tool", result.id, form_data.access_grants, db=db
-                )
+                AccessGrants.set_access_grants("tool", result.id, form_data.access_grants, db=db)
                 if result:
                     return self._to_tool_model(result, db=db)
                 else:
@@ -137,9 +135,7 @@ class ToolsTable:
                 log.exception(f"Error creating a new tool: {e}")
                 return None
 
-    def get_tool_by_id(
-        self, id: str, db: Optional[Session] = None
-    ) -> Optional[ToolModel]:
+    def get_tool_by_id(self, id: str, db: Optional[Session] = None) -> Optional[ToolModel]:
         try:
             with get_db_context(db) as db:
                 tool = db.get(Tool, id)
@@ -173,9 +169,7 @@ class ToolsTable:
         self, user_id: str, permission: str = "write", db: Optional[Session] = None
     ) -> list[ToolUserModel]:
         tools = self.get_tools(db=db)
-        user_group_ids = {
-            group.id for group in Groups.get_groups_by_member_id(user_id, db=db)
-        }
+        user_group_ids = {group.id for group in Groups.get_groups_by_member_id(user_id, db=db)}
 
         return [
             tool
@@ -191,14 +185,12 @@ class ToolsTable:
             )
         ]
 
-    def get_tool_valves_by_id(
-        self, id: str, db: Optional[Session] = None
-    ) -> Optional[dict]:
+    def get_tool_valves_by_id(self, id: str, db: Optional[Session] = None) -> Optional[dict]:
         try:
             with get_db_context(db) as db:
                 tool = db.get(Tool, id)
                 return tool.valves if tool.valves else {}
-        except Exception as e:
+        except Exception:
             log.exception(f"Error getting tool valves by id {id}")
             return None
 
@@ -230,9 +222,7 @@ class ToolsTable:
 
             return user_settings["tools"]["valves"].get(id, {})
         except Exception as e:
-            log.exception(
-                f"Error getting user values by id {id} and user_id {user_id}: {e}"
-            )
+            log.exception(f"Error getting user values by id {id} and user_id {user_id}: {e}")
             return None
 
     def update_user_valves_by_id_and_user_id(
@@ -255,9 +245,7 @@ class ToolsTable:
 
             return user_settings["tools"]["valves"][id]
         except Exception as e:
-            log.exception(
-                f"Error updating user valves by id {id} and user_id {user_id}: {e}"
-            )
+            log.exception(f"Error updating user valves by id {id} and user_id {user_id}: {e}")
             return None
 
     def update_tool_by_id(
@@ -266,9 +254,7 @@ class ToolsTable:
         try:
             with get_db_context(db) as db:
                 access_grants = updated.pop("access_grants", None)
-                db.query(Tool).filter_by(id=id).update(
-                    {**updated, "updated_at": int(time.time())}
-                )
+                db.query(Tool).filter_by(id=id).update({**updated, "updated_at": int(time.time())})
                 db.commit()
                 if access_grants is not None:
                     AccessGrants.set_access_grants("tool", id, access_grants, db=db)

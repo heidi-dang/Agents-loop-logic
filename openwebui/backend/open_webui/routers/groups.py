@@ -1,5 +1,3 @@
-import os
-from pathlib import Path
 from typing import Optional
 import logging
 
@@ -13,9 +11,8 @@ from open_webui.models.groups import (
     UserIdsForm,
 )
 
-from open_webui.config import CACHE_DIR
 from open_webui.constants import ERROR_MESSAGES
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from open_webui.internal.db import get_session
 from sqlalchemy.orm import Session

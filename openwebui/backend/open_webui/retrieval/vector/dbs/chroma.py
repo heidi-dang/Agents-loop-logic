@@ -37,9 +37,7 @@ class ChromaClient(VectorDBBase):
         if CHROMA_CLIENT_AUTH_PROVIDER is not None:
             settings_dict["chroma_client_auth_provider"] = CHROMA_CLIENT_AUTH_PROVIDER
         if CHROMA_CLIENT_AUTH_CREDENTIALS is not None:
-            settings_dict["chroma_client_auth_credentials"] = (
-                CHROMA_CLIENT_AUTH_CREDENTIALS
-            )
+            settings_dict["chroma_client_auth_credentials"] = CHROMA_CLIENT_AUTH_CREDENTIALS
 
         if CHROMA_HTTP_HOST != "":
             self.client = chromadb.HttpClient(
@@ -100,7 +98,7 @@ class ChromaClient(VectorDBBase):
                     }
                 )
             return None
-        except Exception as e:
+        except Exception:
             return None
 
     def query(
@@ -171,9 +169,7 @@ class ChromaClient(VectorDBBase):
         embeddings = [item["vector"] for item in items]
         metadatas = [process_metadata(item["metadata"]) for item in items]
 
-        collection.upsert(
-            ids=ids, documents=documents, embeddings=embeddings, metadatas=metadatas
-        )
+        collection.upsert(ids=ids, documents=documents, embeddings=embeddings, metadatas=metadatas)
 
     def delete(
         self,
@@ -189,7 +185,7 @@ class ChromaClient(VectorDBBase):
                     collection.delete(ids=ids)
                 elif filter:
                     collection.delete(where=filter)
-        except Exception as e:
+        except Exception:
             # If collection doesn't exist, that's fine - nothing to delete
             log.debug(
                 f"Attempted to delete from non-existent collection {collection_name}. Ignoring."

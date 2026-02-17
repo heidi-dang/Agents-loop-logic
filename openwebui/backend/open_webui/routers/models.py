@@ -1,8 +1,6 @@
 from typing import Optional
 import io
 import base64
-import json
-import asyncio
 import logging
 
 from open_webui.models.groups import Groups
@@ -12,7 +10,6 @@ from open_webui.models.models import (
     ModelModel,
     ModelParams,
     ModelResponse,
-    ModelListResponse,
     ModelAccessListResponse,
     ModelAccessResponse,
     Models,
@@ -131,9 +128,7 @@ async def get_models(
 
 
 @router.get("/base", response_model=list[ModelResponse])
-async def get_base_models(
-    user=Depends(get_admin_user), db: Session = Depends(get_session)
-):
+async def get_base_models(user=Depends(get_admin_user), db: Session = Depends(get_session)):
     return Models.get_base_models(db=db)
 
 
@@ -143,9 +138,7 @@ async def get_base_models(
 
 
 @router.get("/tags", response_model=list[str])
-async def get_model_tags(
-    user=Depends(get_verified_user), db: Session = Depends(get_session)
-):
+async def get_model_tags(user=Depends(get_verified_user), db: Session = Depends(get_session)):
     if user.role == "admin" and BYPASS_ADMIN_ACCESS_CONTROL:
         models = Models.get_models(db=db)
     else:
@@ -272,9 +265,7 @@ async def import_models(
             ]
             existing_models = {
                 model.id: model
-                for model in (
-                    Models.get_models_by_ids(model_ids, db=db) if model_ids else []
-                )
+                for model in (Models.get_models_by_ids(model_ids, db=db) if model_ids else [])
             }
 
             for model_data in data:
@@ -288,18 +279,14 @@ async def import_models(
                         model_data["meta"] = model_data.get("meta", {})
                         model_data["params"] = model_data.get("params", {})
 
-                        updated_model = ModelForm(
-                            **{**existing_model.model_dump(), **model_data}
-                        )
+                        updated_model = ModelForm(**{**existing_model.model_dump(), **model_data})
                         Models.update_model_by_id(model_id, updated_model, db=db)
                     else:
                         # Insert new model
                         model_data["meta"] = model_data.get("meta", {})
                         model_data["params"] = model_data.get("params", {})
                         new_model = ModelForm(**model_data)
-                        Models.insert_new_model(
-                            user_id=user.id, form_data=new_model, db=db
-                        )
+                        Models.insert_new_model(user_id=user.id, form_data=new_model, db=db)
             return True
         else:
             raise HTTPException(status_code=400, detail="Invalid JSON format")
@@ -414,7 +401,7 @@ def get_model_profile_image(id: str, user=Depends(get_verified_user)):
                         media_type=media_type,
                         headers=headers,
                     )
-                except Exception as e:
+                except Exception:
                     pass
 
         return FileResponse(f"{STATIC_DIR}/favicon.png")
@@ -499,9 +486,7 @@ async def update_model_by_id(
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
         )
 
-    model = Models.update_model_by_id(
-        form_data.id, ModelForm(**form_data.model_dump()), db=db
-    )
+    model = Models.update_model_by_id(form_data.id, ModelForm(**form_data.model_dump()), db=db)
     return model
 
 
@@ -577,15 +562,10 @@ async def update_model_access_by_id(
         form_data.access_grants = [
             grant
             for grant in form_data.access_grants
-            if not (
-                grant.get("principal_type") == "user"
-                and grant.get("principal_id") == "*"
-            )
+            if not (grant.get("principal_type") == "user" and grant.get("principal_id") == "*")
         ]
 
-    AccessGrants.set_access_grants(
-        "model", form_data.id, form_data.access_grants, db=db
-    )
+    AccessGrants.set_access_grants("model", form_data.id, form_data.access_grants, db=db)
 
     return Models.get_model_by_id(form_data.id, db=db)
 
@@ -629,8 +609,6 @@ async def delete_model_by_id(
 
 
 @router.delete("/delete/all", response_model=bool)
-async def delete_all_models(
-    user=Depends(get_admin_user), db: Session = Depends(get_session)
-):
+async def delete_all_models(user=Depends(get_admin_user), db: Session = Depends(get_session)):
     result = Models.delete_all_models(db=db)
     return result

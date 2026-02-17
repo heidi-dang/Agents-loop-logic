@@ -1,26 +1,21 @@
-import json
 import logging
 import time
 from typing import Optional
 import uuid
 
 from sqlalchemy.orm import Session
-from open_webui.internal.db import Base, JSONField, get_db, get_db_context
-
-from open_webui.models.files import FileMetadataResponse
+from open_webui.internal.db import Base, get_db_context
 
 
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import (
     BigInteger,
     Column,
-    String,
     Text,
     JSON,
     and_,
     func,
     ForeignKey,
-    cast,
     or_,
     select,
 )
@@ -198,9 +193,7 @@ class GroupTable:
                                 json_share_lower == "members",
                                 Group.id.in_(member_groups_select),
                             )
-                            query = query.filter(
-                                or_(anyone_can_share, members_only_and_is_member)
-                            )
+                            query = query.filter(or_(anyone_can_share, members_only_and_is_member))
                         else:
                             query = query.filter(anyone_can_share)
                     else:
@@ -211,9 +204,9 @@ class GroupTable:
                 else:
                     # Only apply member_id filter when share filter is NOT present
                     if "member_id" in filter:
-                        query = query.join(
-                            GroupMember, GroupMember.group_id == Group.id
-                        ).filter(GroupMember.user_id == filter["member_id"])
+                        query = query.join(GroupMember, GroupMember.group_id == Group.id).filter(
+                            GroupMember.user_id == filter["member_id"]
+                        )
 
             groups = query.order_by(Group.updated_at.desc()).all()
             group_ids = [group.id for group in groups]
@@ -242,17 +235,15 @@ class GroupTable:
                 if "query" in filter:
                     query = query.filter(Group.name.ilike(f"%{filter['query']}%"))
                 if "member_id" in filter:
-                    query = query.join(
-                        GroupMember, GroupMember.group_id == Group.id
-                    ).filter(GroupMember.user_id == filter["member_id"])
+                    query = query.join(GroupMember, GroupMember.group_id == Group.id).filter(
+                        GroupMember.user_id == filter["member_id"]
+                    )
 
                 if "share" in filter:
                     #  'share' is stored in data JSON, support both sqlite and postgres
                     share_value = filter["share"]
                     print("Filtering by share:", share_value)
-                    query = query.filter(
-                        Group.data.op("->>")("share") == str(share_value)
-                    )
+                    query = query.filter(Group.data.op("->>")("share") == str(share_value))
 
             total = query.count()
             query = query.order_by(Group.updated_at.desc())
@@ -305,9 +296,7 @@ class GroupTable:
 
             return user_groups
 
-    def get_group_by_id(
-        self, id: str, db: Optional[Session] = None
-    ) -> Optional[GroupModel]:
+    def get_group_by_id(self, id: str, db: Optional[Session] = None) -> Optional[GroupModel]:
         try:
             with get_db_context(db) as db:
                 group = db.query(Group).filter_by(id=id).first()
@@ -315,13 +304,9 @@ class GroupTable:
         except Exception:
             return None
 
-    def get_group_user_ids_by_id(
-        self, id: str, db: Optional[Session] = None
-    ) -> list[str]:
+    def get_group_user_ids_by_id(self, id: str, db: Optional[Session] = None) -> list[str]:
         with get_db_context(db) as db:
-            members = (
-                db.query(GroupMember.user_id).filter(GroupMember.group_id == id).all()
-            )
+            members = db.query(GroupMember.user_id).filter(GroupMember.group_id == id).all()
 
             if not members:
                 return []
@@ -338,9 +323,7 @@ class GroupTable:
                 .all()
             )
 
-            group_user_ids: dict[str, list[str]] = {
-                group_id: [] for group_id in group_ids
-            }
+            group_user_ids: dict[str, list[str]] = {group_id: [] for group_id in group_ids}
 
             for group_id, user_id in members:
                 group_user_ids[group_id].append(user_id)
@@ -370,9 +353,7 @@ class GroupTable:
             db.add_all(new_members)
             db.commit()
 
-    def get_group_member_count_by_id(
-        self, id: str, db: Optional[Session] = None
-    ) -> int:
+    def get_group_member_count_by_id(self, id: str, db: Optional[Session] = None) -> int:
         with get_db_context(db) as db:
             count = (
                 db.query(func.count(GroupMember.user_id))
@@ -435,9 +416,7 @@ class GroupTable:
             except Exception:
                 return False
 
-    def remove_user_from_all_groups(
-        self, user_id: str, db: Optional[Session] = None
-    ) -> bool:
+    def remove_user_from_all_groups(self, user_id: str, db: Optional[Session] = None) -> bool:
         with get_db_context(db) as db:
             try:
                 # Find all groups the user belongs to
@@ -454,9 +433,7 @@ class GroupTable:
                         GroupMember.group_id == group.id, GroupMember.user_id == user_id
                     ).delete()
 
-                    db.query(Group).filter_by(id=group.id).update(
-                        {"updated_at": int(time.time())}
-                    )
+                    db.query(Group).filter_by(id=group.id).update({"updated_at": int(time.time())})
 
                 db.commit()
                 return True
@@ -505,9 +482,7 @@ class GroupTable:
                 now = int(time.time())
 
                 # 1. Groups that SHOULD contain the user
-                target_groups = (
-                    db.query(Group).filter(Group.name.in_(group_names)).all()
-                )
+                target_groups = db.query(Group).filter(Group.name.in_(group_names)).all()
                 target_group_ids = {g.id for g in target_groups}
 
                 # 2. Groups the user is CURRENTLY in

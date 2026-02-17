@@ -23,9 +23,7 @@ class ColBERT(BaseReranker):
             # and the following error is thrown:
             # /root/.cache/torch_extensions/py311_cpu/segmented_maxsim_cpp/segmented_maxsim_cpp.so: cannot open shared object file: No such file or directory
 
-            lock_file = (
-                "/root/.cache/torch_extensions/py311_cpu/segmented_maxsim_cpp/lock"
-            )
+            lock_file = "/root/.cache/torch_extensions/py311_cpu/segmented_maxsim_cpp/lock"
             if os.path.exists(lock_file):
                 os.remove(lock_file)
 
@@ -80,8 +78,6 @@ class ColBERT(BaseReranker):
         embedded_query = embedded_queries[0]
 
         # Calculate retrieval scores for the query against all documents
-        scores = self.calculate_similarity_scores(
-            embedded_query.unsqueeze(0), embedded_docs
-        )
+        scores = self.calculate_similarity_scores(embedded_query.unsqueeze(0), embedded_docs)
 
         return scores

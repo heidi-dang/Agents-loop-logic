@@ -1,14 +1,12 @@
 import logging
-import time
-import uuid
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from open_webui.internal.db import Base, JSONField, get_db, get_db_context
+from open_webui.internal.db import Base, get_db_context
 
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import BigInteger, Column, String, JSON, PrimaryKeyConstraint, Index
+from sqlalchemy import Column, String, JSON, PrimaryKeyConstraint, Index
 
 log = logging.getLogger(__name__)
 
@@ -81,9 +79,7 @@ class TagTable:
         except Exception:
             return None
 
-    def get_tags_by_user_id(
-        self, user_id: str, db: Optional[Session] = None
-    ) -> list[TagModel]:
+    def get_tags_by_user_id(self, user_id: str, db: Optional[Session] = None) -> list[TagModel]:
         with get_db_context(db) as db:
             return [
                 TagModel.model_validate(tag)
@@ -96,9 +92,7 @@ class TagTable:
         with get_db_context(db) as db:
             return [
                 TagModel.model_validate(tag)
-                for tag in (
-                    db.query(Tag).filter(Tag.id.in_(ids), Tag.user_id == user_id).all()
-                )
+                for tag in (db.query(Tag).filter(Tag.id.in_(ids), Tag.user_id == user_id).all())
             ]
 
     def delete_tag_by_name_and_user_id(

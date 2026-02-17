@@ -2,7 +2,7 @@ import time
 from typing import Optional
 
 from sqlalchemy.orm import Session, defer
-from open_webui.internal.db import Base, JSONField, get_db, get_db_context
+from open_webui.internal.db import Base, get_db_context
 
 
 from open_webui.env import DATABASE_USER_ACTIVE_STATUS_UPDATE_INTERVAL
@@ -21,12 +21,10 @@ from sqlalchemy import (
     JSON,
     Column,
     String,
-    Boolean,
     Text,
     Date,
     exists,
     select,
-    cast,
 )
 from sqlalchemy import or_, case, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -293,9 +291,7 @@ class UsersTable:
             else:
                 return None
 
-    def get_user_by_id(
-        self, id: str, db: Optional[Session] = None
-    ) -> Optional[UserModel]:
+    def get_user_by_id(self, id: str, db: Optional[Session] = None) -> Optional[UserModel]:
         try:
             with get_db_context(db) as db:
                 user = db.query(User).filter_by(id=id).first()
@@ -318,16 +314,10 @@ class UsersTable:
         except Exception:
             return None
 
-    def get_user_by_email(
-        self, email: str, db: Optional[Session] = None
-    ) -> Optional[UserModel]:
+    def get_user_by_email(self, email: str, db: Optional[Session] = None) -> Optional[UserModel]:
         try:
             with get_db_context(db) as db:
-                user = (
-                    db.query(User)
-                    .filter(func.lower(User.email) == email.lower())
-                    .first()
-                )
+                user = db.query(User).filter(func.lower(User.email) == email.lower()).first()
                 return UserModel.model_validate(user) if user else None
         except Exception:
             return None
@@ -343,13 +333,11 @@ class UsersTable:
                 if dialect_name == "sqlite":
                     query = query.filter(User.oauth.contains({provider: {"sub": sub}}))
                 elif dialect_name == "postgresql":
-                    query = query.filter(
-                        User.oauth[provider].cast(JSONB)["sub"].astext == sub
-                    )
+                    query = query.filter(User.oauth[provider].cast(JSONB)["sub"].astext == sub)
 
                 user = query.first()
                 return UserModel.model_validate(user) if user else None
-        except Exception as e:
+        except Exception:
             # You may want to log the exception here
             return None
 
@@ -367,8 +355,7 @@ class UsersTable:
                     )
                 elif dialect_name == "postgresql":
                     query = query.filter(
-                        User.scim[provider].cast(JSONB)["external_id"].astext
-                        == external_id
+                        User.scim[provider].cast(JSONB)["external_id"].astext == external_id
                     )
 
                 user = query.first()
@@ -514,9 +501,7 @@ class UsersTable:
                 "total": total,
             }
 
-    def get_users_by_group_id(
-        self, group_id: str, db: Optional[Session] = None
-    ) -> list[UserModel]:
+    def get_users_by_group_id(self, group_id: str, db: Optional[Session] = None) -> list[UserModel]:
         with get_db_context(db) as db:
             users = (
                 db.query(User)
@@ -555,9 +540,7 @@ class UsersTable:
         except Exception:
             return None
 
-    def get_user_webhook_url_by_id(
-        self, id: str, db: Optional[Session] = None
-    ) -> Optional[str]:
+    def get_user_webhook_url_by_id(self, id: str, db: Optional[Session] = None) -> Optional[str]:
         try:
             with get_db_context(db) as db:
                 user = db.query(User).filter_by(id=id).first()
@@ -577,9 +560,7 @@ class UsersTable:
         with get_db_context(db) as db:
             current_timestamp = int(datetime.datetime.now().timestamp())
             today_midnight_timestamp = current_timestamp - (current_timestamp % 86400)
-            query = db.query(User).filter(
-                User.last_active_at > today_midnight_timestamp
-            )
+            query = db.query(User).filter(User.last_active_at > today_midnight_timestamp)
             return query.count()
 
     def update_user_role_by_id(
@@ -768,9 +749,7 @@ class UsersTable:
         except Exception:
             return False
 
-    def get_user_api_key_by_id(
-        self, id: str, db: Optional[Session] = None
-    ) -> Optional[str]:
+    def get_user_api_key_by_id(self, id: str, db: Optional[Session] = None) -> Optional[str]:
         try:
             with get_db_context(db) as db:
                 api_key = db.query(ApiKey).filter_by(user_id=id).first()
@@ -811,9 +790,7 @@ class UsersTable:
         except Exception:
             return False
 
-    def get_valid_user_ids(
-        self, user_ids: list[str], db: Optional[Session] = None
-    ) -> list[str]:
+    def get_valid_user_ids(self, user_ids: list[str], db: Optional[Session] = None) -> list[str]:
         with get_db_context(db) as db:
             users = db.query(User).filter(User.id.in_(user_ids)).all()
             return [user.id for user in users]
@@ -830,9 +807,7 @@ class UsersTable:
         with get_db_context(db) as db:
             # Consider user active if last_active_at within the last 3 minutes
             three_minutes_ago = int(time.time()) - 180
-            count = (
-                db.query(User).filter(User.last_active_at >= three_minutes_ago).count()
-            )
+            count = db.query(User).filter(User.last_active_at >= three_minutes_ago).count()
             return count
 
     @staticmethod

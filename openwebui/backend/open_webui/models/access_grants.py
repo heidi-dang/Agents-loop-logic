@@ -8,7 +8,6 @@ from open_webui.internal.db import Base, get_db_context
 
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import BigInteger, Column, Text, UniqueConstraint, or_, and_
-from sqlalchemy.dialects.postgresql import JSONB
 
 log = logging.getLogger(__name__)
 
@@ -27,9 +26,7 @@ class AccessGrant(Base):
     )  # "knowledge", "model", "prompt", "tool", "note", "channel", "file"
     resource_id = Column(Text, nullable=False)
     principal_type = Column(Text, nullable=False)  # "user" or "group"
-    principal_id = Column(
-        Text, nullable=False
-    )  # user_id, group_id, or "*" (wildcard for public)
+    principal_id = Column(Text, nullable=False)  # user_id, group_id, or "*" (wildcard for public)
     permission = Column(Text, nullable=False)  # "read" or "write"
     created_at = Column(BigInteger, nullable=False)
 
@@ -362,9 +359,7 @@ class AccessGrantsTable:
             ).delete()
 
             # Convert JSON to grant dicts
-            grant_dicts = access_control_to_grants(
-                resource_type, resource_id, access_control
-            )
+            grant_dicts = access_control_to_grants(resource_type, resource_id, access_control)
 
             # Insert new grants
             results = []
@@ -582,7 +577,7 @@ class AccessGrantsTable:
         Get all users who have the specified permission on a resource.
         Returns a list of UserModel instances.
         """
-        from open_webui.models.users import Users, UserModel
+        from open_webui.models.users import Users
         from open_webui.models.groups import Groups
 
         with get_db_context(db) as db:
@@ -608,9 +603,7 @@ class AccessGrantsTable:
                 if grant.principal_type == "user":
                     user_ids_with_access.add(grant.principal_id)
                 elif grant.principal_type == "group":
-                    group_user_ids = Groups.get_group_user_ids_by_id(
-                        grant.principal_id, db=db
-                    )
+                    group_user_ids = Groups.get_group_user_ids_by_id(grant.principal_id, db=db)
                     if group_user_ids:
                         user_ids_with_access.update(group_user_ids)
 
@@ -679,7 +672,7 @@ class AccessGrantsTable:
 
         # LEFT JOIN access_grant and filter
         # We use a subquery approach to avoid duplicates from multiple matching grants
-        from sqlalchemy import exists as sa_exists, select
+        from sqlalchemy import select
 
         grant_exists = (
             select(AccessGrant.id)
@@ -741,7 +734,7 @@ class AccessGrantsTable:
         group_ids = filter.get("group_ids", [])
         user_id = filter.get("user_id")
 
-        from sqlalchemy import exists as sa_exists, select
+        from sqlalchemy import select
 
         # Has read grant (not public)
         read_grant_exists = (

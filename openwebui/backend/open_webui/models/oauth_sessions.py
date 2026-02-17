@@ -9,11 +9,11 @@ import json
 from cryptography.fernet import Fernet
 
 from sqlalchemy.orm import Session
-from open_webui.internal.db import Base, get_db, get_db_context
+from open_webui.internal.db import Base, get_db_context
 from open_webui.env import OAUTH_SESSION_TOKEN_ENCRYPTION_KEY
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import BigInteger, Column, String, Text, Index
+from sqlalchemy import BigInteger, Column, Text, Index
 
 log = logging.getLogger(__name__)
 
@@ -28,9 +28,7 @@ class OAuthSession(Base):
     id = Column(Text, primary_key=True, unique=True)
     user_id = Column(Text, nullable=False)
     provider = Column(Text, nullable=False)
-    token = Column(
-        Text, nullable=False
-    )  # JSON with access_token, id_token, refresh_token
+    token = Column(Text, nullable=False)  # JSON with access_token, id_token, refresh_token
     expires_at = Column(BigInteger, nullable=False)
     created_at = Column(BigInteger, nullable=False)
     updated_at = Column(BigInteger, nullable=False)
@@ -165,11 +163,7 @@ class OAuthSessionTable:
         """Get OAuth session by ID and user ID"""
         try:
             with get_db_context(db) as db:
-                session = (
-                    db.query(OAuthSession)
-                    .filter_by(id=session_id, user_id=user_id)
-                    .first()
-                )
+                session = db.query(OAuthSession).filter_by(id=session_id, user_id=user_id).first()
                 if session:
                     session.token = self._decrypt_token(session.token)
                     return OAuthSessionModel.model_validate(session)
@@ -186,9 +180,7 @@ class OAuthSessionTable:
         try:
             with get_db_context(db) as db:
                 session = (
-                    db.query(OAuthSession)
-                    .filter_by(provider=provider, user_id=user_id)
-                    .first()
+                    db.query(OAuthSession).filter_by(provider=provider, user_id=user_id).first()
                 )
                 if session:
                     session.token = self._decrypt_token(session.token)
@@ -245,9 +237,7 @@ class OAuthSessionTable:
             log.error(f"Error updating OAuth session tokens: {e}")
             return None
 
-    def delete_session_by_id(
-        self, session_id: str, db: Optional[Session] = None
-    ) -> bool:
+    def delete_session_by_id(self, session_id: str, db: Optional[Session] = None) -> bool:
         """Delete an OAuth session"""
         try:
             with get_db_context(db) as db:
@@ -258,22 +248,18 @@ class OAuthSessionTable:
             log.error(f"Error deleting OAuth session: {e}")
             return False
 
-    def delete_sessions_by_user_id(
-        self, user_id: str, db: Optional[Session] = None
-    ) -> bool:
+    def delete_sessions_by_user_id(self, user_id: str, db: Optional[Session] = None) -> bool:
         """Delete all OAuth sessions for a user"""
         try:
             with get_db_context(db) as db:
-                result = db.query(OAuthSession).filter_by(user_id=user_id).delete()
+                db.query(OAuthSession).filter_by(user_id=user_id).delete()
                 db.commit()
                 return True
         except Exception as e:
             log.error(f"Error deleting OAuth sessions by user ID: {e}")
             return False
 
-    def delete_sessions_by_provider(
-        self, provider: str, db: Optional[Session] = None
-    ) -> bool:
+    def delete_sessions_by_provider(self, provider: str, db: Optional[Session] = None) -> bool:
         """Delete all OAuth sessions for a provider"""
         try:
             with get_db_context(db) as db:

@@ -52,9 +52,7 @@ def search_google_pse(
         results = json_response.get("items", [])
         if results:  # check if results are returned. If not, no more pages to fetch.
             all_results.extend(results)
-            count -= len(
-                results
-            )  # Decrement count by the number of results fetched in this page.
+            count -= len(results)  # Decrement count by the number of results fetched in this page.
             start_index += 10  # Increment start index for the next page
         else:
             break  # No more results from Google PSE, break the loop

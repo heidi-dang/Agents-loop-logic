@@ -2,7 +2,6 @@ import logging
 from typing import Optional, Tuple, List, Dict, Any
 from urllib.parse import urlparse
 
-import grpc
 from open_webui.config import (
     QDRANT_API_KEY,
     QDRANT_GRPC_PORT,
@@ -20,7 +19,6 @@ from open_webui.retrieval.vector.main import (
     VectorItem,
 )
 from qdrant_client import QdrantClient as Qclient
-from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.http.models import PointStruct
 from qdrant_client.models import models
 
@@ -32,15 +30,11 @@ log = logging.getLogger(__name__)
 
 
 def _tenant_filter(tenant_id: str) -> models.FieldCondition:
-    return models.FieldCondition(
-        key=TENANT_ID_FIELD, match=models.MatchValue(value=tenant_id)
-    )
+    return models.FieldCondition(key=TENANT_ID_FIELD, match=models.MatchValue(value=tenant_id))
 
 
 def _metadata_filter(key: str, value: Any) -> models.FieldCondition:
-    return models.FieldCondition(
-        key=f"metadata.{key}", match=models.MatchValue(value=value)
-    )
+    return models.FieldCondition(key=f"metadata.{key}", match=models.MatchValue(value=value))
 
 
 class QdrantClient(VectorDBBase):
@@ -126,9 +120,7 @@ class QdrantClient(VectorDBBase):
             return self.WEB_SEARCH_COLLECTION, tenant_id
 
         # Handle hash-based collections (YouTube and web URLs)
-        elif len(collection_name) == 63 and all(
-            c in "0123456789abcdef" for c in collection_name
-        ):
+        elif len(collection_name) == 63 and all(c in "0123456789abcdef" for c in collection_name):
             return self.HASH_BASED_COLLECTION, tenant_id
 
         else:
@@ -178,9 +170,7 @@ class QdrantClient(VectorDBBase):
                 ),
             )
 
-    def _create_points(
-        self, items: List[VectorItem], tenant_id: str
-    ) -> List[PointStruct]:
+    def _create_points(self, items: List[VectorItem], tenant_id: str) -> List[PointStruct]:
         """
         Create point structs from vector items with tenant ID.
         """
@@ -197,9 +187,7 @@ class QdrantClient(VectorDBBase):
             for item in items
         ]
 
-    def _ensure_collection(
-        self, mt_collection_name: str, dimension: int = DEFAULT_DIMENSION
-    ):
+    def _ensure_collection(self, mt_collection_name: str, dimension: int = DEFAULT_DIMENSION):
         """
         Ensure the collection exists and payload indexes are created for tenant_id and metadata fields.
         """
@@ -285,9 +273,7 @@ class QdrantClient(VectorDBBase):
             distances=[[(point.score + 1.0) / 2.0 for point in query_response.points]],
         )
 
-    def query(
-        self, collection_name: str, filter: Dict[str, Any], limit: Optional[int] = None
-    ):
+    def query(self, collection_name: str, filter: Dict[str, Any], limit: Optional[int] = None):
         """
         Query points with filters and tenant isolation.
         """

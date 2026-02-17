@@ -1,6 +1,7 @@
 from playwright.sync_api import sync_playwright
 import sys
 
+
 def run(playwright):
     browser = playwright.chromium.launch(headless=True)
     page = browser.new_page()
@@ -35,6 +36,7 @@ def run(playwright):
         sys.exit(1)
     finally:
         browser.close()
+
 
 if __name__ == "__main__":
     with sync_playwright() as playwright:

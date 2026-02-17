@@ -88,9 +88,7 @@ def search_yandex(
         if "rawData" not in response_body:
             raise Exception(f"No `rawData` in response body: {response_body}")
 
-        search_result_body_bytes = base64.decodebytes(
-            bytes(response_body["rawData"], "utf-8")
-        )
+        search_result_body_bytes = base64.decodebytes(bytes(response_body["rawData"], "utf-8"))
 
         doc_root = ET.parse(io.BytesIO(search_result_body_bytes))
 
@@ -99,15 +97,9 @@ def search_yandex(
         for group in doc_root.findall("response/results/grouping/group"):
             results.append(
                 {
-                    "url": xml_element_contents_to_string(group.find("doc/url")).strip(
-                        "\n"
-                    ),
-                    "title": xml_element_contents_to_string(
-                        group.find("doc/title")
-                    ).strip("\n"),
-                    "snippet": xml_element_contents_to_string(
-                        group.find("doc/passages/passage")
-                    ),
+                    "url": xml_element_contents_to_string(group.find("doc/url")).strip("\n"),
+                    "title": xml_element_contents_to_string(group.find("doc/title")).strip("\n"),
+                    "snippet": xml_element_contents_to_string(group.find("doc/passages/passage")),
                 }
             )
 
@@ -154,9 +146,7 @@ if __name__ == "__main__":
         ),
         os.environ.get("YANDEX_WEB_SEARCH_URL", ""),
         os.environ.get("YANDEX_WEB_SEARCH_API_KEY", ""),
-        os.environ.get(
-            "YANDEX_WEB_SEARCH_CONFIG", '{"query": {"searchType": "SEARCH_TYPE_COM"}}'
-        ),
+        os.environ.get("YANDEX_WEB_SEARCH_CONFIG", '{"query": {"searchType": "SEARCH_TYPE_COM"}}'),
         "TOP movies of the past year",
         3,
     )

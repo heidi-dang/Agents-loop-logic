@@ -1,5 +1,4 @@
 import logging
-import copy
 from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel, ConfigDict
 import aiohttp
@@ -17,7 +16,6 @@ from open_webui.utils.tools import (
     set_tool_servers,
 )
 from open_webui.utils.mcp.client import MCPClient
-from open_webui.models.oauth_sessions import OAuthSessions
 
 
 from open_webui.utils.oauth import (
@@ -83,12 +81,8 @@ async def set_connections_config(
     form_data: ConnectionsConfigForm,
     user=Depends(get_admin_user),
 ):
-    request.app.state.config.ENABLE_DIRECT_CONNECTIONS = (
-        form_data.ENABLE_DIRECT_CONNECTIONS
-    )
-    request.app.state.config.ENABLE_BASE_MODELS_CACHE = (
-        form_data.ENABLE_BASE_MODELS_CACHE
-    )
+    request.app.state.config.ENABLE_DIRECT_CONNECTIONS = form_data.ENABLE_DIRECT_CONNECTIONS
+    request.app.state.config.ENABLE_BASE_MODELS_CACHE = form_data.ENABLE_BASE_MODELS_CACHE
 
     return {
         "ENABLE_DIRECT_CONNECTIONS": request.app.state.config.ENABLE_DIRECT_CONNECTIONS,
@@ -114,22 +108,18 @@ async def register_oauth_client(
         if type:
             oauth_client_id = f"{type}:{form_data.client_id}"
 
-        oauth_client_info = (
-            await get_oauth_client_info_with_dynamic_client_registration(
-                request, oauth_client_id, form_data.url
-            )
+        oauth_client_info = await get_oauth_client_info_with_dynamic_client_registration(
+            request, oauth_client_id, form_data.url
         )
         return {
             "status": True,
-            "oauth_client_info": encrypt_data(
-                oauth_client_info.model_dump(mode="json")
-            ),
+            "oauth_client_info": encrypt_data(oauth_client_info.model_dump(mode="json")),
         }
     except Exception as e:
         log.debug(f"Failed to register OAuth client: {e}")
         raise HTTPException(
             status_code=400,
-            detail=f"Failed to register OAuth client",
+            detail="Failed to register OAuth client",
         )
 
 
@@ -196,9 +186,7 @@ async def set_tool_servers_config(
 
             if auth_type == "oauth_2.1" and server_id:
                 try:
-                    oauth_client_info = connection.get("info", {}).get(
-                        "oauth_client_info", ""
-                    )
+                    oauth_client_info = connection.get("info", {}).get("oauth_client_info", "")
                     oauth_client_info = decrypt_data(oauth_client_info)
 
                     request.app.state.oauth_client_manager.add_client(
@@ -226,22 +214,16 @@ async def verify_tool_servers_config(
             if form_data.auth_type == "oauth_2.1":
                 discovery_urls = await get_discovery_urls(form_data.url)
                 for discovery_url in discovery_urls:
-                    log.debug(
-                        f"Trying to fetch OAuth 2.1 discovery document from {discovery_url}"
-                    )
+                    log.debug(f"Trying to fetch OAuth 2.1 discovery document from {discovery_url}")
                     async with aiohttp.ClientSession(
                         trust_env=True,
                         timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT),
                     ) as session:
-                        async with session.get(
-                            discovery_url
-                        ) as oauth_server_metadata_response:
+                        async with session.get(discovery_url) as oauth_server_metadata_response:
                             if oauth_server_metadata_response.status == 200:
                                 try:
-                                    oauth_server_metadata = (
-                                        OAuthMetadata.model_validate(
-                                            await oauth_server_metadata_response.json()
-                                        )
+                                    oauth_server_metadata = OAuthMetadata.model_validate(
+                                        await oauth_server_metadata_response.json()
                                     )
                                     return {
                                         "status": True,
@@ -250,9 +232,7 @@ async def verify_tool_servers_config(
                                         ),
                                     }
                                 except Exception as e:
-                                    log.info(
-                                        f"Failed to parse OAuth 2.1 discovery document: {e}"
-                                    )
+                                    log.info(f"Failed to parse OAuth 2.1 discovery document: {e}")
                                     raise HTTPException(
                                         status_code=400,
                                         detail=f"Failed to parse OAuth 2.1 discovery document from {discovery_url}",
@@ -283,7 +263,7 @@ async def verify_tool_servers_config(
 
                                 if oauth_token:
                                     token = oauth_token.get("access_token", "")
-                        except Exception as e:
+                        except Exception:
                             pass
                     if token:
                         headers = {"Authorization": f"Bearer {token}"}
@@ -303,7 +283,7 @@ async def verify_tool_servers_config(
                     log.debug(f"Failed to create MCP client: {e}")
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Failed to create MCP client",
+                        detail="Failed to create MCP client",
                     )
                 finally:
                     if client:
@@ -318,17 +298,15 @@ async def verify_tool_servers_config(
             elif form_data.auth_type == "system_oauth":
                 try:
                     if request.cookies.get("oauth_session_id", None):
-                        oauth_token = (
-                            await request.app.state.oauth_manager.get_oauth_token(
-                                user.id,
-                                request.cookies.get("oauth_session_id", None),
-                            )
+                        oauth_token = await request.app.state.oauth_manager.get_oauth_token(
+                            user.id,
+                            request.cookies.get("oauth_session_id", None),
                         )
 
                         if oauth_token:
                             token = oauth_token.get("access_token", "")
 
-                except Exception as e:
+                except Exception:
                     pass
 
             if token:
@@ -347,7 +325,7 @@ async def verify_tool_servers_config(
         log.debug(f"Failed to connect to the tool server: {e}")
         raise HTTPException(
             status_code=400,
-            detail=f"Failed to connect to the tool server",
+            detail="Failed to connect to the tool server",
         )
 
 
@@ -401,12 +379,8 @@ async def set_code_execution_config(
     request.app.state.config.ENABLE_CODE_EXECUTION = form_data.ENABLE_CODE_EXECUTION
 
     request.app.state.config.CODE_EXECUTION_ENGINE = form_data.CODE_EXECUTION_ENGINE
-    request.app.state.config.CODE_EXECUTION_JUPYTER_URL = (
-        form_data.CODE_EXECUTION_JUPYTER_URL
-    )
-    request.app.state.config.CODE_EXECUTION_JUPYTER_AUTH = (
-        form_data.CODE_EXECUTION_JUPYTER_AUTH
-    )
+    request.app.state.config.CODE_EXECUTION_JUPYTER_URL = form_data.CODE_EXECUTION_JUPYTER_URL
+    request.app.state.config.CODE_EXECUTION_JUPYTER_AUTH = form_data.CODE_EXECUTION_JUPYTER_AUTH
     request.app.state.config.CODE_EXECUTION_JUPYTER_AUTH_TOKEN = (
         form_data.CODE_EXECUTION_JUPYTER_AUTH_TOKEN
     )
@@ -423,13 +397,9 @@ async def set_code_execution_config(
         form_data.CODE_INTERPRETER_PROMPT_TEMPLATE
     )
 
-    request.app.state.config.CODE_INTERPRETER_JUPYTER_URL = (
-        form_data.CODE_INTERPRETER_JUPYTER_URL
-    )
+    request.app.state.config.CODE_INTERPRETER_JUPYTER_URL = form_data.CODE_INTERPRETER_JUPYTER_URL
 
-    request.app.state.config.CODE_INTERPRETER_JUPYTER_AUTH = (
-        form_data.CODE_INTERPRETER_JUPYTER_AUTH
-    )
+    request.app.state.config.CODE_INTERPRETER_JUPYTER_AUTH = form_data.CODE_INTERPRETER_JUPYTER_AUTH
 
     request.app.state.config.CODE_INTERPRETER_JUPYTER_AUTH_TOKEN = (
         form_data.CODE_INTERPRETER_JUPYTER_AUTH_TOKEN

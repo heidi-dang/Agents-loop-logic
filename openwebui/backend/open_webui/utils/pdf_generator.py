@@ -1,10 +1,8 @@
 from datetime import datetime
-from io import BytesIO
 from pathlib import Path
 from typing import Dict, Any, List
 from html import escape
 
-from markdown import markdown
 
 import site
 from fpdf import FPDF
@@ -36,7 +34,7 @@ class PDFGenerator:
         try:
             date_time = datetime.fromtimestamp(timestamp)
             return date_time.strftime("%Y-%m-%d, %H:%M:%S")
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             # Log the error if necessary
             return ""
 
@@ -121,9 +119,7 @@ class PDFGenerator:
             pdf.add_font("Twemoji", "", f"{FONTS_DIR}/Twemoji.ttf")
 
             pdf.set_font("NotoSans", size=12)
-            pdf.set_fallback_fonts(
-                ["NotoSansKR", "NotoSansJP", "NotoSansSC", "Twemoji"]
-            )
+            pdf.set_fallback_fonts(["NotoSansKR", "NotoSansJP", "NotoSansSC", "Twemoji"])
 
             pdf.set_auto_page_break(auto=True, margin=15)
 

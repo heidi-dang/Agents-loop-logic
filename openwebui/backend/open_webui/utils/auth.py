@@ -9,15 +9,12 @@ import os
 import bcrypt
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.primitives.asymmetric import ed25519
-from cryptography.hazmat.primitives import serialization
 import json
 
 
 from datetime import datetime, timedelta
-import pytz
 from pytz import UTC
-from typing import Optional, Union, List, Dict
+from typing import Optional, Union
 
 from opentelemetry import trace
 
@@ -31,7 +28,6 @@ from open_webui.constants import ERROR_MESSAGES
 
 from open_webui.env import (
     ENABLE_PASSWORD_VALIDATION,
-    OFFLINE_MODE,
     LICENSE_BLOB,
     PASSWORD_VALIDATION_HINT,
     PASSWORD_VALIDATION_REGEX_PATTERN,
@@ -110,9 +106,7 @@ def get_license_data(app, key):
             data_handler(payload)
             return True
         else:
-            log.error(
-                f"License: retrieval issue: {getattr(res, 'text', 'unknown error')}"
-            )
+            log.error(f"License: retrieval issue: {getattr(res, 'text', 'unknown error')}")
 
     if key:
         us = [
@@ -240,9 +234,7 @@ async def invalidate_token(request, token):
         exp = decoded.get("exp")
 
         if jti and exp:
-            ttl = exp - int(
-                datetime.now(UTC).timestamp()
-            )  # Calculate time-to-live for the token
+            ttl = exp - int(datetime.now(UTC).timestamp())  # Calculate time-to-live for the token
 
             if ttl > 0:
                 # Store the revoked token in Redis with an expiration time
@@ -311,7 +303,7 @@ async def get_current_user(
     try:
         try:
             data = decode_token(token)
-        except Exception as e:
+        except Exception:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token",
@@ -332,9 +324,7 @@ async def get_current_user(
                 )
             else:
                 if WEBUI_AUTH_TRUSTED_EMAIL_HEADER:
-                    trusted_email = request.headers.get(
-                        WEBUI_AUTH_TRUSTED_EMAIL_HEADER, ""
-                    ).lower()
+                    trusted_email = request.headers.get(WEBUI_AUTH_TRUSTED_EMAIL_HEADER, "").lower()
                     if trusted_email and user.email != trusted_email:
                         raise HTTPException(
                             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -392,9 +382,7 @@ def get_current_user_by_api_key(request, api_key: str):
             request.app.state.config.USER_PERMISSIONS,
         )
     ):
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.API_KEY_NOT_ALLOWED
-        )
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.API_KEY_NOT_ALLOWED)
 
     # Add user info to current span
     current_span = trace.get_current_span()

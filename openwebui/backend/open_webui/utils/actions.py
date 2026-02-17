@@ -98,9 +98,7 @@ async def chat_action(request: Request, action_id: str, form_data: dict, user: A
                 try:
                     if hasattr(function_module, "UserValves"):
                         __user__["valves"] = function_module.UserValves(
-                            **Functions.get_user_valves_by_id_and_user_id(
-                                action_id, user.id
-                            )
+                            **Functions.get_user_valves_by_id_and_user_id(action_id, user.id)
                         )
                 except Exception as e:
                     log.exception(f"Failed to get user values: {e}")

@@ -43,9 +43,7 @@ class StorageProvider(ABC):
         pass
 
     @abstractmethod
-    def upload_file(
-        self, file: BinaryIO, filename: str, tags: Dict[str, str]
-    ) -> Tuple[bytes, str]:
+    def upload_file(self, file: BinaryIO, filename: str, tags: Dict[str, str]) -> Tuple[bytes, str]:
         pass
 
     @abstractmethod
@@ -59,9 +57,7 @@ class StorageProvider(ABC):
 
 class LocalStorageProvider(StorageProvider):
     @staticmethod
-    def upload_file(
-        file: BinaryIO, filename: str, tags: Dict[str, str]
-    ) -> Tuple[bytes, str]:
+    def upload_file(file: BinaryIO, filename: str, tags: Dict[str, str]) -> Tuple[bytes, str]:
         contents = file.read()
         if not contents:
             raise ValueError(ERROR_MESSAGES.EMPTY_CONTENT)
@@ -142,9 +138,7 @@ class S3StorageProvider(StorageProvider):
         """Only include S3 allowed characters."""
         return re.sub(r"[^a-zA-Z0-9 äöüÄÖÜß\+\-=\._:/@]", "", s)
 
-    def upload_file(
-        self, file: BinaryIO, filename: str, tags: Dict[str, str]
-    ) -> Tuple[bytes, str]:
+    def upload_file(self, file: BinaryIO, filename: str, tags: Dict[str, str]) -> Tuple[bytes, str]:
         """Handles uploading of the file to S3 storage."""
         _, file_path = LocalStorageProvider.upload_file(file, filename, tags)
         s3_key = os.path.join(self.key_prefix, filename)
@@ -152,14 +146,9 @@ class S3StorageProvider(StorageProvider):
             self.s3_client.upload_file(file_path, self.bucket_name, s3_key)
             if S3_ENABLE_TAGGING and tags:
                 sanitized_tags = {
-                    self.sanitize_tag_value(k): self.sanitize_tag_value(v)
-                    for k, v in tags.items()
+                    self.sanitize_tag_value(k): self.sanitize_tag_value(v) for k, v in tags.items()
                 }
-                tagging = {
-                    "TagSet": [
-                        {"Key": k, "Value": v} for k, v in sanitized_tags.items()
-                    ]
-                }
+                tagging = {"TagSet": [{"Key": k, "Value": v} for k, v in sanitized_tags.items()]}
                 self.s3_client.put_object_tagging(
                     Bucket=self.bucket_name,
                     Key=s3_key,
@@ -203,9 +192,7 @@ class S3StorageProvider(StorageProvider):
                     if not content["Key"].startswith(self.key_prefix):
                         continue
 
-                    self.s3_client.delete_object(
-                        Bucket=self.bucket_name, Key=content["Key"]
-                    )
+                    self.s3_client.delete_object(Bucket=self.bucket_name, Key=content["Key"])
         except ClientError as e:
             raise RuntimeError(f"Error deleting all files from S3: {e}")
 
@@ -235,9 +222,7 @@ class GCSStorageProvider(StorageProvider):
             self.gcs_client = storage.Client()
         self.bucket = self.gcs_client.bucket(GCS_BUCKET_NAME)
 
-    def upload_file(
-        self, file: BinaryIO, filename: str, tags: Dict[str, str]
-    ) -> Tuple[bytes, str]:
+    def upload_file(self, file: BinaryIO, filename: str, tags: Dict[str, str]) -> Tuple[bytes, str]:
         """Handles uploading of the file to GCS storage."""
         contents, file_path = LocalStorageProvider.upload_file(file, filename, tags)
         try:
@@ -303,13 +288,9 @@ class AzureStorageProvider(StorageProvider):
             self.blob_service_client = BlobServiceClient(
                 account_url=self.endpoint, credential=DefaultAzureCredential()
             )
-        self.container_client = self.blob_service_client.get_container_client(
-            self.container_name
-        )
+        self.container_client = self.blob_service_client.get_container_client(self.container_name)
 
-    def upload_file(
-        self, file: BinaryIO, filename: str, tags: Dict[str, str]
-    ) -> Tuple[bytes, str]:
+    def upload_file(self, file: BinaryIO, filename: str, tags: Dict[str, str]) -> Tuple[bytes, str]:
         """Handles uploading of the file to Azure Blob Storage."""
         contents, file_path = LocalStorageProvider.upload_file(file, filename, tags)
         try:

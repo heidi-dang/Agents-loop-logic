@@ -90,6 +90,17 @@ ui/
 - Node.js backend (reference has Express/socket.io)
 - Database changes
 - API contract changes
+- Backend port changes (Heidi uses port 7777, not OpenWebUI's 8080)
+
+### Port Strategy
+
+| Service | Port | Notes |
+|---------|------|-------|
+| Heidi CLI | 7777 | Default Heidi backend port |
+| OpenWebUI | 8080 | Vendored, separate from Heidi |
+| Reference UI | (not running) | Design reference only |
+
+**Why not conflict**: Heidi CLI UI runs on Vite dev server (5173) or builds to static dist. Backend is separate process on 7777. No conflict with OpenWebUI's 8080.
 
 ## Testing Checklist
 

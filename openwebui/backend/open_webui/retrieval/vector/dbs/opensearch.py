@@ -94,9 +94,7 @@ class OpenSearchClient(VectorDBBase):
                 }
             },
         }
-        self.client.indices.create(
-            index=self._get_index_name(collection_name), body=body
-        )
+        self.client.indices.create(index=self._get_index_name(collection_name), body=body)
 
     def _create_batches(self, items: list[VectorItem], batch_size=100):
         for i in range(0, len(items), batch_size):
@@ -140,13 +138,11 @@ class OpenSearchClient(VectorDBBase):
                 },
             }
 
-            result = self.client.search(
-                index=self._get_index_name(collection_name), body=query
-            )
+            result = self.client.search(index=self._get_index_name(collection_name), body=query)
 
             return self._result_to_search_result(result)
 
-        except Exception as e:
+        except Exception:
             return None
 
     def query(
@@ -176,7 +172,7 @@ class OpenSearchClient(VectorDBBase):
 
             return self._result_to_get_result(result)
 
-        except Exception as e:
+        except Exception:
             return None
 
     def _create_index_if_not_exists(self, collection_name: str, dimension: int):
@@ -186,9 +182,7 @@ class OpenSearchClient(VectorDBBase):
     def get(self, collection_name: str) -> Optional[GetResult]:
         query = {"query": {"match_all": {}}, "_source": ["text", "metadata"]}
 
-        result = self.client.search(
-            index=self._get_index_name(collection_name), body=query
-        )
+        result = self.client.search(index=self._get_index_name(collection_name), body=query)
         return self._result_to_get_result(result)
 
     def insert(self, collection_name: str, items: list[VectorItem]):

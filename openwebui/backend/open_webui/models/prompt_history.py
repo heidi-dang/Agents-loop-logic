@@ -3,7 +3,6 @@
 import time
 import uuid
 from typing import Optional
-import json
 import difflib
 
 from sqlalchemy.orm import Session
@@ -11,7 +10,7 @@ from open_webui.internal.db import Base, get_db_context
 from open_webui.models.users import Users, UserResponse
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import BigInteger, Column, Text, JSON, Index
+from sqlalchemy import BigInteger, Column, Text, JSON
 
 ####################
 # PromptHistory DB Schema
@@ -116,9 +115,7 @@ class PromptHistoryTable:
     ) -> Optional[PromptHistoryModel]:
         """Get a specific history entry by ID."""
         with get_db_context(db) as db:
-            entry = (
-                db.query(PromptHistory).filter(PromptHistory.id == history_id).first()
-            )
+            entry = db.query(PromptHistory).filter(PromptHistory.id == history_id).first()
             if entry:
                 return PromptHistoryModel.model_validate(entry)
             return None
@@ -147,11 +144,7 @@ class PromptHistoryTable:
     ) -> int:
         """Get the number of history entries for a prompt."""
         with get_db_context(db) as db:
-            return (
-                db.query(PromptHistory)
-                .filter(PromptHistory.prompt_id == prompt_id)
-                .count()
-            )
+            return db.query(PromptHistory).filter(PromptHistory.prompt_id == prompt_id).count()
 
     def compute_diff(
         self,
@@ -161,9 +154,7 @@ class PromptHistoryTable:
     ) -> Optional[dict]:
         """Compute diff between two history entries."""
         with get_db_context(db) as db:
-            from_entry = (
-                db.query(PromptHistory).filter(PromptHistory.id == from_id).first()
-            )
+            from_entry = db.query(PromptHistory).filter(PromptHistory.id == from_id).first()
             to_entry = db.query(PromptHistory).filter(PromptHistory.id == to_id).first()
 
             if not from_entry or not to_entry:
@@ -202,9 +193,7 @@ class PromptHistoryTable:
     ) -> bool:
         """Delete all history entries for a prompt."""
         with get_db_context(db) as db:
-            db.query(PromptHistory).filter(
-                PromptHistory.prompt_id == prompt_id
-            ).delete()
+            db.query(PromptHistory).filter(PromptHistory.prompt_id == prompt_id).delete()
             db.commit()
             return True
 

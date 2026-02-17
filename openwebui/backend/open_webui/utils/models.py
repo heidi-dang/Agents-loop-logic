@@ -3,7 +3,6 @@ import logging
 import asyncio
 import sys
 
-from aiocache import cached
 from fastapi import Request
 
 from open_webui.socket.utils import RedisDict
@@ -18,7 +17,6 @@ from open_webui.models.groups import Groups
 
 
 from open_webui.utils.plugin import (
-    load_function_module_by_id,
     get_function_module_from_cache,
 )
 from open_webui.utils.access_control import has_access
@@ -131,20 +129,14 @@ async def get_all_models(request, refresh: bool = False, user: UserModel = None)
             ]
         models = models + arena_models
 
-    global_action_ids = [
-        function.id for function in Functions.get_global_action_functions()
-    ]
+    global_action_ids = [function.id for function in Functions.get_global_action_functions()]
     enabled_action_ids = [
-        function.id
-        for function in Functions.get_functions_by_type("action", active_only=True)
+        function.id for function in Functions.get_functions_by_type("action", active_only=True)
     ]
 
-    global_filter_ids = [
-        function.id for function in Functions.get_global_filter_functions()
-    ]
+    global_filter_ids = [function.id for function in Functions.get_global_filter_functions()]
     enabled_filter_ids = [
-        function.id
-        for function in Functions.get_functions_by_type("filter", active_only=True)
+        function.id for function in Functions.get_functions_by_type("filter", active_only=True)
     ]
 
     custom_models = Models.get_all_models()
@@ -152,12 +144,15 @@ async def get_all_models(request, refresh: bool = False, user: UserModel = None)
         if custom_model.base_model_id is None:
             # Applied directly to a base model
             for model in models:
-                if custom_model.id == model["id"] or (
-                    model.get("owned_by") == "ollama"
-                    and custom_model.id
-                    == model["id"].split(":")[
-                        0
-                    ]  # Ollama may return model ids in different formats (e.g., 'llama3' vs. 'llama3:7b')
+                if (
+                    custom_model.id == model["id"]
+                    or (
+                        model.get("owned_by") == "ollama"
+                        and custom_model.id
+                        == model["id"].split(":")[
+                            0
+                        ]  # Ollama may return model ids in different formats (e.g., 'llama3' vs. 'llama3:7b')
+                    )
                 ):
                     if custom_model.is_active:
                         model["name"] = custom_model.name
@@ -169,12 +164,8 @@ async def get_all_models(request, refresh: bool = False, user: UserModel = None)
 
                         if "info" in model:
                             if "meta" in model["info"]:
-                                action_ids.extend(
-                                    model["info"]["meta"].get("actionIds", [])
-                                )
-                                filter_ids.extend(
-                                    model["info"]["meta"].get("filterIds", [])
-                                )
+                                action_ids.extend(model["info"]["meta"].get("actionIds", []))
+                                filter_ids.extend(model["info"]["meta"].get("filterIds", []))
 
                             if "params" in model["info"]:
                                 # Remove params to avoid exposing sensitive info
@@ -185,9 +176,7 @@ async def get_all_models(request, refresh: bool = False, user: UserModel = None)
                     else:
                         models.remove(model)
 
-        elif custom_model.is_active and (
-            custom_model.id not in [model["id"] for model in models]
-        ):
+        elif custom_model.is_active and (custom_model.id not in [model["id"] for model in models]):
             # Custom model based on a base model
             owned_by = "openai"
             connection_type = None
@@ -309,9 +298,7 @@ async def get_all_models(request, refresh: bool = False, user: UserModel = None)
                 raise Exception(f"Action not found: {action_id}")
 
             function_module = get_function_module_by_id(action_id)
-            model["actions"].extend(
-                get_action_items_from_module(action_function, function_module)
-            )
+            model["actions"].extend(get_action_items_from_module(action_function, function_module))
 
         model["filters"] = []
         for filter_id in filter_ids:
@@ -368,18 +355,14 @@ def check_model_access(user, model, db=None):
 def get_filtered_models(models, user, db=None):
     # Filter out models that the user does not have access to
     if (
-        user.role == "user"
-        or (user.role == "admin" and not BYPASS_ADMIN_ACCESS_CONTROL)
+        user.role == "user" or (user.role == "admin" and not BYPASS_ADMIN_ACCESS_CONTROL)
     ) and not BYPASS_MODEL_ACCESS_CONTROL:
         model_ids = [model["id"] for model in models if not model.get("arena")]
         model_infos = {
-            model_info.id: model_info
-            for model_info in Models.get_models_by_ids(model_ids)
+            model_info.id: model_info for model_info in Models.get_models_by_ids(model_ids)
         }
 
-        user_group_ids = {
-            group.id for group in Groups.get_groups_by_member_id(user.id, db=db)
-        }
+        user_group_ids = {group.id for group in Groups.get_groups_by_member_id(user.id, db=db)}
 
         # Batch-fetch accessible resource IDs in a single query instead of N has_access calls
         accessible_model_ids = AccessGrants.get_accessible_resource_ids(

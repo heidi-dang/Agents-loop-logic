@@ -2,7 +2,6 @@ import os
 import re
 import subprocess
 import sys
-from importlib import util
 import types
 import tempfile
 import logging
@@ -15,9 +14,7 @@ from open_webui.models.tools import Tools
 log = logging.getLogger(__name__)
 
 
-def resolve_valves_schema_options(
-    valves_class: type, schema: dict, user: Any = None
-) -> dict:
+def resolve_valves_schema_options(valves_class: type, schema: dict, user: Any = None) -> dict:
     """
     Resolve dynamic options in a Valves schema.
 
@@ -114,21 +111,15 @@ def resolve_valves_schema_options(
                 # Prepare kwargs based on what the method accepts
                 kwargs = {}
                 if "__user__" in params and user is not None:
-                    kwargs["__user__"] = (
-                        user.model_dump() if hasattr(user, "model_dump") else user
-                    )
+                    kwargs["__user__"] = user.model_dump() if hasattr(user, "model_dump") else user
                 if "user" in params and user is not None:
-                    kwargs["user"] = (
-                        user.model_dump() if hasattr(user, "model_dump") else user
-                    )
+                    kwargs["user"] = user.model_dump() if hasattr(user, "model_dump") else user
 
                 resolved_options = method(**kwargs) if kwargs else method()
 
                 # Validate return type
                 if not isinstance(resolved_options, list):
-                    log.warning(
-                        f"Method '{options}' did not return a list for {prop_name}"
-                    )
+                    log.warning(f"Method '{options}' did not return a list for {prop_name}")
                     continue
 
             except Exception as e:
@@ -319,9 +310,7 @@ def get_tool_module_from_cache(request, tool_id, load_from_db=True):
         if (
             hasattr(request.app.state, "TOOL_CONTENTS")
             and tool_id in request.app.state.TOOL_CONTENTS
-        ) and (
-            hasattr(request.app.state, "TOOLS") and tool_id in request.app.state.TOOLS
-        ):
+        ) and (hasattr(request.app.state, "TOOLS") and tool_id in request.app.state.TOOLS):
             if request.app.state.TOOL_CONTENTS[tool_id] == content:
                 return request.app.state.TOOLS[tool_id], None
 
@@ -365,8 +354,7 @@ def get_function_module_from_cache(request, function_id, load_from_db=True):
             hasattr(request.app.state, "FUNCTION_CONTENTS")
             and function_id in request.app.state.FUNCTION_CONTENTS
         ) and (
-            hasattr(request.app.state, "FUNCTIONS")
-            and function_id in request.app.state.FUNCTIONS
+            hasattr(request.app.state, "FUNCTIONS") and function_id in request.app.state.FUNCTIONS
         ):
             if request.app.state.FUNCTION_CONTENTS[function_id] == content:
                 return request.app.state.FUNCTIONS[function_id], None, None
@@ -378,15 +366,10 @@ def get_function_module_from_cache(request, function_id, load_from_db=True):
         # Load from cache (e.g. "stream" hook)
         # This is useful for performance reasons
 
-        if (
-            hasattr(request.app.state, "FUNCTIONS")
-            and function_id in request.app.state.FUNCTIONS
-        ):
+        if hasattr(request.app.state, "FUNCTIONS") and function_id in request.app.state.FUNCTIONS:
             return request.app.state.FUNCTIONS[function_id], None, None
 
-        function_module, function_type, frontmatter = load_function_module_by_id(
-            function_id
-        )
+        function_module, function_type, frontmatter = load_function_module_by_id(function_id)
 
     if not hasattr(request.app.state, "FUNCTIONS"):
         request.app.state.FUNCTIONS = {}

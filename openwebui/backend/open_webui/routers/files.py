@@ -78,9 +78,7 @@ def has_access_to_file(
 
     # Check if the file is associated with any knowledge bases the user has access to
     knowledge_bases = Knowledges.get_knowledges_by_file_id(file_id, db=db)
-    user_group_ids = {
-        group.id for group in Groups.get_groups_by_member_id(user.id, db=db)
-    }
+    user_group_ids = {group.id for group in Groups.get_groups_by_member_id(user.id, db=db)}
     for knowledge_base in knowledge_bases:
         if knowledge_base.user_id == user.id or AccessGrants.has_access(
             user_id=user.id,
@@ -94,9 +92,7 @@ def has_access_to_file(
 
     knowledge_base_id = file.meta.get("collection_name") if file.meta else None
     if knowledge_base_id:
-        knowledge_bases = Knowledges.get_knowledge_bases_by_user_id(
-            user.id, access_type, db=db
-        )
+        knowledge_bases = Knowledges.get_knowledge_bases_by_user_id(user.id, access_type, db=db)
         for knowledge_base in knowledge_bases:
             if knowledge_base.id == knowledge_base_id:
                 return True
@@ -136,19 +132,13 @@ def process_uploaded_file(
                     request.app.state.config, "STT_SUPPORTED_CONTENT_TYPES", []
                 )
 
-                if strict_match_mime_type(
-                    stt_supported_content_types, file.content_type
-                ):
+                if strict_match_mime_type(stt_supported_content_types, file.content_type):
                     file_path_processed = Storage.get_file(file_path)
-                    result = transcribe(
-                        request, file_path_processed, file_metadata, user
-                    )
+                    result = transcribe(request, file_path_processed, file_metadata, user)
 
                     process_file(
                         request,
-                        ProcessFileForm(
-                            file_id=file_item.id, content=result.get("text", "")
-                        ),
+                        ProcessFileForm(file_id=file_item.id, content=result.get("text", "")),
                         user=user,
                         db=db_session,
                     )
@@ -255,9 +245,7 @@ def upload_file_handler(
             if file_extension not in request.app.state.config.ALLOWED_FILE_EXTENSIONS:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=ERROR_MESSAGES.DEFAULT(
-                        f"File type {file_extension} is not allowed"
-                    ),
+                    detail=ERROR_MESSAGES.DEFAULT(f"File type {file_extension} is not allowed"),
                 )
 
         # replace filename with uuid
@@ -288,9 +276,7 @@ def upload_file_handler(
                     "meta": {
                         "name": name,
                         "content_type": (
-                            file.content_type
-                            if isinstance(file.content_type, str)
-                            else None
+                            file.content_type if isinstance(file.content_type, str) else None
                         ),
                         "size": len(contents),
                         "data": file_metadata,
@@ -305,9 +291,7 @@ def upload_file_handler(
                 file_metadata["channel_id"], user.id, db=db
             )
             if channel:
-                Channels.add_file_to_channel_by_id(
-                    channel.id, file_item.id, user.id, db=db
-                )
+                Channels.add_file_to_channel_by_id(channel.id, file_item.id, user.id, db=db)
 
         if process:
             if background_tasks and process_in_background:
@@ -388,9 +372,7 @@ async def search_files(
     ),
     content: bool = Query(True),
     skip: int = Query(0, ge=0, description="Number of files to skip"),
-    limit: int = Query(
-        100, ge=1, le=1000, description="Maximum number of files to return"
-    ),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of files to return"),
     user=Depends(get_verified_user),
     db: Session = Depends(get_session),
 ):
@@ -430,9 +412,7 @@ async def search_files(
 
 
 @router.delete("/all")
-async def delete_all_files(
-    user=Depends(get_admin_user), db: Session = Depends(get_session)
-):
+async def delete_all_files(user=Depends(get_admin_user), db: Session = Depends(get_session)):
     result = Files.delete_all_files(db=db)
     if result:
         try:
@@ -670,9 +650,7 @@ async def get_file_content_by_id(
                         f"attachment; filename*=UTF-8''{encoded_filename}"
                     )
                 else:
-                    if content_type == "application/pdf" or filename.lower().endswith(
-                        ".pdf"
-                    ):
+                    if content_type == "application/pdf" or filename.lower().endswith(".pdf"):
                         headers["Content-Disposition"] = (
                             f"inline; filename*=UTF-8''{encoded_filename}"
                         )
@@ -776,9 +754,7 @@ async def get_file_content_by_id(
         # Handle Unicode filenames
         filename = file.meta.get("name", file.filename)
         encoded_filename = quote(filename)  # RFC5987 encoding
-        headers = {
-            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
-        }
+        headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"}
 
         if file_path:
             file_path = Storage.get_file(file_path)
@@ -795,7 +771,6 @@ async def get_file_content_by_id(
         else:
             # File path doesn’t exist, return the content as .txt if possible
             file_content = file.content.get("content", "")
-            file_name = file.filename
 
             # Create a generator that encodes the file content
             def generator():
@@ -835,7 +810,6 @@ async def delete_file_by_id(
         or user.role == "admin"
         or has_access_to_file(id, "write", user, db=db)
     ):
-
         # Clean up KB associations and embeddings before deleting
         knowledges = Knowledges.get_knowledges_by_file_id(id, db=db)
         for knowledge in knowledges:
@@ -843,9 +817,7 @@ async def delete_file_by_id(
             Knowledges.remove_file_from_knowledge_by_id(knowledge.id, id, db=db)
             # Clean KB embeddings (same logic as /knowledge/{id}/file/remove)
             try:
-                VECTOR_DB_CLIENT.delete(
-                    collection_name=knowledge.id, filter={"file_id": id}
-                )
+                VECTOR_DB_CLIENT.delete(collection_name=knowledge.id, filter={"file_id": id})
                 if file.hash:
                     VECTOR_DB_CLIENT.delete(
                         collection_name=knowledge.id, filter={"hash": file.hash}

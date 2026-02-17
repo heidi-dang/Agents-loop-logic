@@ -83,9 +83,7 @@ def upgrade() -> None:
 
         # Query all rows
         try:
-            result = conn.execute(
-                sa.text(f'SELECT id, access_control FROM "{table_name}"')
-            )
+            result = conn.execute(sa.text(f'SELECT id, access_control FROM "{table_name}"'))
             rows = result.fetchall()
         except Exception:
             continue
@@ -152,12 +150,8 @@ def upgrade() -> None:
             read_data = access_control_json.get("read", {})
             write_data = access_control_json.get("write", {})
 
-            has_read_grants = read_data.get("group_ids", []) or read_data.get(
-                "user_ids", []
-            )
-            has_write_grants = write_data.get("group_ids", []) or write_data.get(
-                "user_ids", []
-            )
+            has_read_grants = read_data.get("group_ids", []) or read_data.get("user_ids", [])
+            has_write_grants = write_data.get("group_ids", []) or write_data.get("user_ids", [])
 
             if not has_read_grants and not has_write_grants:
                 # Empty permissions = private, no grants needed
@@ -284,32 +278,18 @@ def downgrade() -> None:
                 }
 
             # Handle public access (user:* for read)
-            if (
-                principal_type == "user"
-                and principal_id == "*"
-                and permission == "read"
-            ):
+            if principal_type == "user" and principal_id == "*" and permission == "read":
                 resource_grants[resource_id]["is_public"] = True
                 continue
 
             # Add to appropriate list
             if permission in ["read", "write"]:
                 if principal_type == "group":
-                    if (
-                        principal_id
-                        not in resource_grants[resource_id][permission]["group_ids"]
-                    ):
-                        resource_grants[resource_id][permission]["group_ids"].append(
-                            principal_id
-                        )
+                    if principal_id not in resource_grants[resource_id][permission]["group_ids"]:
+                        resource_grants[resource_id][permission]["group_ids"].append(principal_id)
                 elif principal_type == "user":
-                    if (
-                        principal_id
-                        not in resource_grants[resource_id][permission]["user_ids"]
-                    ):
-                        resource_grants[resource_id][permission]["user_ids"].append(
-                            principal_id
-                        )
+                    if principal_id not in resource_grants[resource_id][permission]["user_ids"]:
+                        resource_grants[resource_id][permission]["user_ids"].append(principal_id)
 
         # Step 3: Update each resource with reconstructed JSON
         for resource_id, grants in resource_grants.items():

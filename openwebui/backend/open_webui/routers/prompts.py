@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 
 from open_webui.models.prompts import (
     PromptForm,
-    PromptUserResponse,
     PromptAccessResponse,
     PromptAccessListResponse,
     PromptModel,
@@ -17,7 +16,7 @@ from open_webui.models.prompt_history import (
     PromptHistoryResponse,
 )
 from open_webui.constants import ERROR_MESSAGES
-from open_webui.utils.auth import get_admin_user, get_verified_user
+from open_webui.utils.auth import get_verified_user
 from open_webui.utils.access_control import has_permission
 from open_webui.config import BYPASS_ADMIN_ACCESS_CONTROL
 from open_webui.internal.db import get_session
@@ -46,9 +45,7 @@ PAGE_ITEM_COUNT = 30
 
 
 @router.get("/", response_model=list[PromptModel])
-async def get_prompts(
-    user=Depends(get_verified_user), db: Session = Depends(get_session)
-):
+async def get_prompts(user=Depends(get_verified_user), db: Session = Depends(get_session)):
     if user.role == "admin" and BYPASS_ADMIN_ACCESS_CONTROL:
         prompts = Prompts.get_prompts(db=db)
     else:
@@ -58,9 +55,7 @@ async def get_prompts(
 
 
 @router.get("/tags", response_model=list[str])
-async def get_prompt_tags(
-    user=Depends(get_verified_user), db: Session = Depends(get_session)
-):
+async def get_prompt_tags(user=Depends(get_verified_user), db: Session = Depends(get_session)):
     if user.role == "admin" and BYPASS_ADMIN_ACCESS_CONTROL:
         return Prompts.get_tags(db=db)
     else:
@@ -110,9 +105,7 @@ async def get_prompt_list(
 
         filter["user_id"] = user.id
 
-    result = Prompts.search_prompts(
-        user.id, filter=filter, skip=skip, limit=limit, db=db
-    )
+    result = Prompts.search_prompts(user.id, filter=filter, skip=skip, limit=limit, db=db)
 
     # Batch-fetch writable prompt IDs in a single query instead of N has_access calls
     prompt_ids = [prompt.id for prompt in result.items]
@@ -421,9 +414,7 @@ async def set_prompt_version(
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
         )
 
-    updated_prompt = Prompts.update_prompt_version(
-        prompt.id, form_data.version_id, db=db
-    )
+    updated_prompt = Prompts.update_prompt_version(prompt.id, form_data.version_id, db=db)
     if updated_prompt:
         return updated_prompt
     else:
@@ -486,10 +477,7 @@ async def update_prompt_access_by_id(
         form_data.access_grants = [
             grant
             for grant in form_data.access_grants
-            if not (
-                grant.get("principal_type") == "user"
-                and grant.get("principal_id") == "*"
-            )
+            if not (grant.get("principal_type") == "user" and grant.get("principal_id") == "*")
         ]
 
     AccessGrants.set_access_grants("prompt", prompt_id, form_data.access_grants, db=db)
