@@ -6,6 +6,11 @@ on:
     paths:
       - 'openwebui/**'
       - '.github/workflows/docker-openwebui.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'openwebui/**'
+      - '.github/workflows/docker-openwebui.yml'
   workflow_dispatch:
 
 jobs:
