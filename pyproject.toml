@@ -1,6 +1,6 @@
 [project]
 name = "heidi-cli"
-version = "0.1.0"
+version = "0.1.1"
 description = "Heidi CLI - orchestrate Copilot SDK + Jules + OpenCode agent loops"
 requires-python = ">=3.10"
 dependencies = [
