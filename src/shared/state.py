@@ -1,4 +1,3 @@
-from pathlib import Path
 from .config import ConfigLoader
 
 def get_suite_state() -> dict:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import json
 from pathlib import Path
-from typing import Any, Optional, Dict, List
+from typing import Optional, Dict, List
 from pydantic import BaseModel, Field
 
 def find_project_root() -> Path:

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, Request
+from typing import List, Optional
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from .manager import manager
 from ..shared.config import ConfigLoader
@@ -55,7 +55,7 @@ async def chat_completions(request: ChatCompletionRequest):
     except FileNotFoundError as e:
         logger.error(f"Model path error: {e}")
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
+    except Exception:
         logger.exception("Unexpected error in chat_completions")
         raise HTTPException(status_code=500, detail="Internal server error")
 
