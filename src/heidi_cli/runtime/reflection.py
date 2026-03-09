@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 import json
-from typing import List, Dict, Optional
+from typing import Optional
 from .db import db
 
 class ReflectionEngine:

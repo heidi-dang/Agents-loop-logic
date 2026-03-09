@@ -1,13 +1,9 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
-from typing import Optional, List, Dict
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import uvicorn
 
 from .shared.config import ConfigLoader
 

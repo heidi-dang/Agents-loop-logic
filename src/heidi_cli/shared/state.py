@@ -1,4 +1,3 @@
-from pathlib import Path
 from .config import ConfigLoader
 
 def init_suite():

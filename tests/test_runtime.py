@@ -1,8 +1,6 @@
 import pytest
-import sqlite3
 import asyncio
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 # Mock config so the test database goes to an in-memory or throwaway location
 class MockConfig:
@@ -29,7 +27,6 @@ def setup_test_db(monkeypatch):
         MockConfig.memory_sqlite_path.unlink()
 
 def test_memory_retrieval_and_writing():
-    import asyncio
     asyncio.run(_test_memory_retrieval_and_writing())
 
 async def _test_memory_retrieval_and_writing():
@@ -51,7 +48,6 @@ async def _test_memory_retrieval_and_writing():
     assert result[0] == "Always validate user input first."
     
 def test_reflection_engine(monkeypatch):
-    import asyncio
     asyncio.run(_test_reflection_engine(monkeypatch))
 
 async def _test_reflection_engine(monkeypatch):
@@ -76,7 +72,6 @@ async def _test_reflection_engine(monkeypatch):
     assert "success" in res[0].lower()
 
 def test_reward_scorer_and_strategy():
-    import asyncio
     asyncio.run(_test_reward_scorer_and_strategy())
 
 async def _test_reward_scorer_and_strategy():

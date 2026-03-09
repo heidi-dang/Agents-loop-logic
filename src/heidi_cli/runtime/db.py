@@ -3,7 +3,6 @@ from __future__ import annotations
 import sqlite3
 import threading
 from pathlib import Path
-from typing import Any, List, Optional
 from ..shared.config import ConfigLoader
 
 class DatabaseManager:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from typing import List, Optional, Dict
+from typing import List
 from .db import db
 
 class StrategySelector:

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 from ..shared.config import ConfigLoader, ModelConfig
 
 logger = logging.getLogger("heidi.model_host")

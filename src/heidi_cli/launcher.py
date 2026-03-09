@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 from rich.console import Console
 from .shared.config import ConfigLoader

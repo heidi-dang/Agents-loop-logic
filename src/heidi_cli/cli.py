@@ -3,7 +3,6 @@ from __future__ import annotations
 import typer
 import sys
 from rich.console import Console
-from typing import Optional
 
 from .shared.config import ConfigLoader
 from .launcher import start_daemon, stop_process, load_pids
@@ -27,7 +26,7 @@ app.add_typer(learning_app, name="learning")
 def status():
     """Show suite status."""
     config = ConfigLoader.load()
-    console.print(f"[bold]Learning Suite Status[/bold]")
+    console.print("[bold]Learning Suite Status[/bold]")
     console.print(f"Suite Enabled: {config.suite_enabled}")
     console.print(f"Data Root: {config.data_root}")
     console.print(f"Model Host: {config.host}:{config.port} (Enabled: {config.model_host_enabled})")
@@ -35,12 +34,11 @@ def status():
     pids = load_pids()
     if "model_host" in pids:
         console.print(f"Model Host PID: [green]{pids['model_host']}[/green]")
-        console.print(f"Model Host PID: [red]Not running[/red]")
+        console.print("Model Host PID: [red]Not running[/red]")
 
 @app.command()
 def doctor():
     """Run suite verification checks."""
-    import sys
     from pathlib import Path
     
     # Locate the doctor script and run its main logic
