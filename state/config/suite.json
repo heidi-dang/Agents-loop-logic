@@ -1,0 +1,14 @@
+{
+  "models": [
+    {
+      "id": "mock-stable",
+      "path": "/tmp/mock-stable",
+      "backend": "mock"
+    },
+    {
+      "id": "mock-candidate",
+      "path": "/tmp/mock-candidate",
+      "backend": "mock"
+    }
+  ]
+}
