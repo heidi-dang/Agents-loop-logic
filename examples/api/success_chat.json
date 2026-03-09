@@ -1,0 +1,9 @@
+{
+  "model": "qwen-coder-7b",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Write a quicksort."
+    }
+  ]
+}
