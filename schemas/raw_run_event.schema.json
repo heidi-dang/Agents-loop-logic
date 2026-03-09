@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "required": [
+    "run_id",
+    "messages",
+    "response"
+  ]
+}

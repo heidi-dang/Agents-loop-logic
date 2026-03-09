@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "required": [
+    "path",
+    "channel",
+    "registered_at"
+  ]
+}
