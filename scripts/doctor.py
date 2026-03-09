@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
+
+# Add src to python path for direct script execution
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
 from rich.console import Console
 from rich.table import Table
-
-# Add src to path to import suite components
-sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 from heidi_cli.shared.config import ConfigLoader
 
