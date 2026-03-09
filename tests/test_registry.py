@@ -41,7 +41,7 @@ async def _test_registry_registration_and_promotion():
     from heidi_cli.registry.manager import model_registry
     
     # Register experimental
-    vid1 = await model_registry.register_version("v1_exp", Path("/tmp/dummy"))
+    await model_registry.register_version("v1_exp", Path("/tmp/dummy"))
     reg = model_registry.load_registry()
     assert "v1_exp" in reg["versions"]
     assert reg["versions"]["v1_exp"]["channel"] == "experimental"

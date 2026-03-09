@@ -18,7 +18,7 @@ class HotSwapManager:
             return False
 
         version_info = registry_data["versions"][stable_id]
-        model_path = version_info["path"]
+        _model_path = version_info["path"]
 
         logger.info(f"Initiating hot-swap for stable model: {stable_id}")
         
