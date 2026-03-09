@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 import asyncio
+from typing import Optional
 from pathlib import Path
 from datetime import datetime
 from ..shared.config import ConfigLoader
