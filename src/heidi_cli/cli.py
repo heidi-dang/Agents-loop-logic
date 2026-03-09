@@ -58,12 +58,15 @@ def doctor():
         
         # In case the doctor script just prints things upon execution, exec covers it
     else:
+<<<<<<< HEAD
         console.print(f"[red]Doctor script not found at {doctor_script}[/red]")
+=======
+        console.print("Model Host PID: [red]Not running[/red]")
+>>>>>>> a74db21 (Auto-fix ruff lint errors properly)
 
 @app.command()
 def doctor():
     """Run suite verification checks."""
-    import sys
     from pathlib import Path
     
     # Locate the doctor script and run its main logic

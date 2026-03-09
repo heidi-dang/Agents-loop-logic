@@ -3,7 +3,6 @@ import asyncio
 import json
 import shutil
 from pathlib import Path
-from unittest.mock import patch
 
 class MockConfig:
     data_root = Path("/tmp/test_heidi_data")
@@ -24,7 +23,6 @@ def setup_test_dirs(monkeypatch):
         shutil.rmtree(MockConfig.data_root)
 
 def test_pipeline_capture_and_curate():
-    import asyncio
     asyncio.run(_test_pipeline_capture_and_curate())
 
 async def _test_pipeline_capture_and_curate():
