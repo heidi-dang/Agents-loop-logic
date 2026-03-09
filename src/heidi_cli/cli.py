@@ -34,8 +34,31 @@ def status():
     pids = load_pids()
     if "model_host" in pids:
         console.print(f"Model Host PID: [green]{pids['model_host']}[/green]")
-    else:
         console.print("Model Host PID: [red]Not running[/red]")
+
+@app.command()
+def doctor():
+    """Run suite verification checks."""
+    from pathlib import Path
+    
+    # Locate the doctor script and run its main logic
+    doctor_script = Path(__file__).parent.parent.parent / "scripts" / "doctor.py"
+    if doctor_script.exists():
+        # Read and execute the script in the current environment
+        namespace = {"__file__": str(doctor_script)}
+        # Ensure we don't accidentally recursively import cli
+        exec(doctor_script.read_text(), namespace)
+        if "run_doctor" in namespace:
+            namespace["run_doctor"]()
+        elif "check_all" in namespace:
+            namespace["check_all"]()
+        else:
+            # Fallback to just executing it and letting its __main__ run if checking is automatic
+            pass
+        
+        # In case the doctor script just prints things upon execution, exec covers it
+    else:
+        console.print(f"[red]Doctor script not found at {doctor_script}[/red]")
 
 @model_app.command("serve")
 def model_serve():
@@ -79,6 +102,30 @@ def model_stop():
         console.print("[green]✓ Model host stopped.[/green]")
     else:
         console.print("[yellow]Model host was not running.[/yellow]")
+
+@memory_app.command("status")
+def memory_status():
+    """Show memory database status."""
+    from .runtime.db import db
+    conn = db.get_connection()
+    counts = {
+        "memories": conn.execute("SELECT COUNT(*) FROM memories").fetchone()[0],
+        "reflections": conn.execute("SELECT COUNT(*) FROM reflections").fetchone()[0],
+        "rules": conn.execute("SELECT COUNT(*) FROM rules").fetchone()[0],
+        "episodes": conn.execute("SELECT COUNT(*) FROM episodes").fetchone()[0],
+    }
+    console.print("[bold]Memory Database Status[/bold]")
+    for table, count in counts.items():
+        console.print(f" {table.capitalize()}: {count}")
+
+@learning_app.command("reflect")
+def learning_reflect(run_id: str, task: str, outcome: str):
+    """Manually trigger reflection on a run."""
+    import asyncio
+    from .runtime.reflection import reflection_engine
+    console.print(f"Reflecting on run {run_id}...")
+    ref_id = asyncio.run(reflection_engine.reflect_on_run(run_id, task, outcome))
+    console.print(f"[green]✓ Reflection created: {ref_id}[/green]")
 
 if __name__ == "__main__":
     app()
