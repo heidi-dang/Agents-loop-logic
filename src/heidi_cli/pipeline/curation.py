@@ -31,7 +31,18 @@ class CurationEngine:
         if isinstance(data, str):
             return self.redact_text(data)
         elif isinstance(data, dict):
-            return {k: self.redact_json(v) for k, v in data.items()}
+            result = {}
+            for k, v in data.items():
+                # If key looks like a secret, redact the value directly
+                k_lower = str(k).lower()
+                if any(sec in k_lower for sec in ["password", "secret", "key", "token"]):
+                    if isinstance(v, str) and len(v) > 5:
+                        result[k] = "[REDACTED]"
+                    else:
+                        result[k] = self.redact_json(v)
+                else:
+                    result[k] = self.redact_json(v)
+            return result
         elif isinstance(data, list):
             return [self.redact_json(i) for i in data]
         return data

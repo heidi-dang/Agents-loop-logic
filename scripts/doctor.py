@@ -29,7 +29,8 @@ def check_docs():
     base = Path(__file__).parent.parent / "docs"
     docs = [
         "architecture.md", "model-host.md", "auto-registration.md",
-        "runtime.md", "memory-schema.md"
+        "runtime.md", "memory-schema.md",
+        "pipeline.md", "curation-redaction.md"
     ]
     results = []
     for d in docs:
@@ -100,6 +101,22 @@ def run_doctor():
     for t, ok in check_db():
         status = "[green]OK[/green]" if ok else "[red]MISSING[/red]"
         table.add_row(t, status)
+    console.print(table)
+    
+    # Phase 3: Pipeline Integration verification
+    table = Table(title="Pipeline Config Verification")
+    table.add_column("Check")
+    table.add_column("Status")
+    config = ConfigLoader.load()
+    if config.data_root.exists():
+        table.add_row("Data Root Mounted", "[green]OK[/green]")
+    else:
+        table.add_row("Data Root Mounted", "[red]MISSING[/red]")
+        
+    pipeline_dirs = ["raw", "curated"]
+    for d in pipeline_dirs:
+        p = config.data_root / "datasets" / d
+        table.add_row(f"Dataset Dir ({d})", "[green]OK[/green]" if p.exists() else "[yellow]NOT CREATED YET[/yellow]")
     console.print(table)
 
 if __name__ == "__main__":

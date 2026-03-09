@@ -60,6 +60,24 @@ def doctor():
     else:
         console.print(f"[red]Doctor script not found at {doctor_script}[/red]")
 
+@app.command()
+def doctor():
+    """Run suite verification checks."""
+    import sys
+    from pathlib import Path
+    
+    # Locate the doctor script and run its main logic
+    doctor_script = Path(__file__).parent.parent.parent / "scripts" / "doctor.py"
+    if doctor_script.exists():
+        namespace = {"__file__": str(doctor_script)}
+        exec(doctor_script.read_text(), namespace)
+        if "run_doctor" in namespace:
+            namespace["run_doctor"]()
+        elif "check_all" in namespace:
+            namespace["check_all"]()
+    else:
+        console.print(f"[red]Doctor script not found at {doctor_script}[/red]")
+
 @model_app.command("serve")
 def model_serve():
     """Start local model host daemon."""
