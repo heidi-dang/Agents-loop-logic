@@ -44,7 +44,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-heidi_cli = ["ui_dist/**/*", "ui_dist/*"]
+heidi_cli = []
 
 [tool.ruff]
 line-length = 100
@@ -58,4 +58,3 @@ ignore = ["E402", "F823"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-
