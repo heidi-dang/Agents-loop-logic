@@ -22,9 +22,7 @@ dependencies = [
 dev = [
   "pytest>=8.0.0",
   "ruff>=0.3.0",
-  "pytest-asyncio>=0.23.0",
-
-[project.scripts]
+  "pytest-asyncio>=0.23.0"],\n\n[project.scripts]
 heidi = "heidi_cli.cli:app"
 
 [build-system]
