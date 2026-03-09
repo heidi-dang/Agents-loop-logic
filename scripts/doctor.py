@@ -25,7 +25,10 @@ def check_structure():
 def check_docs():
     """Verify documentation exists."""
     base = Path(__file__).parent.parent / "docs"
-    docs = ["architecture.md", "model-host.md", "auto-registration.md"]
+    docs = [
+        "architecture.md", "model-host.md", "auto-registration.md",
+        "runtime.md", "memory-schema.md"
+    ]
     results = []
     for d in docs:
         path = base / d
@@ -43,6 +46,20 @@ def check_config():
         return results
     except Exception as e:
         return [("config_load", False, str(e))]
+
+def check_db():
+    """Verify database and schema."""
+    try:
+        from heidi_cli.runtime.db import db
+        conn = db.get_connection()
+        tables = ["memories", "episodes", "reflections", "rules", "reward_events", "strategy_stats"]
+        results = []
+        for t in tables:
+            res = conn.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{t}'").fetchone()
+            results.append((t, res is not None))
+        return results
+    except Exception as e:
+        return [("db_connection", False, str(e))]
 
 def run_doctor():
     console.print(f"[bold]Learning Suite Doctor[/bold]\n")
@@ -72,6 +89,15 @@ def run_doctor():
     for key, ok in check_config():
         status = "[green]OK[/green]" if ok else "[red]MISSING[/red]"
         table.add_row(key, status)
+    console.print(table)
+
+    # DB
+    table = Table(title="Database & Schema")
+    table.add_column("Table")
+    table.add_column("Status")
+    for t, ok in check_db():
+        status = "[green]OK[/green]" if ok else "[red]MISSING[/red]"
+        table.add_row(t, status)
     console.print(table)
 
 if __name__ == "__main__":
