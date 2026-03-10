@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, AsyncGenerator
 from ..shared.config import ConfigLoader, ModelConfig
 from .metadata import metadata_manager, ModelStatus, ModelMetrics, ModelProvider
+from ..integrations.analytics import get_analytics
 
 logger = logging.getLogger("heidi.model_host")
 
@@ -195,6 +196,13 @@ class ModelManager:
         start_time = time.time()
         self.request_count += 1
         
+        # Get analytics instance
+        analytics = get_analytics()
+        
+        # Calculate input tokens (rough estimate)
+        input_text = " ".join([msg.get("content", "") for msg in messages])
+        input_tokens = len(input_text.split()) * 1.3  # Rough token estimation
+        
         try:
             # Check if it's an OpenCode model
             if model_id.startswith("opencode-"):
@@ -215,6 +223,18 @@ class ModelManager:
             self.total_response_time += response_time
             self._update_model_metrics(model_id, response_time, success=True)
             
+            # Record analytics
+            response_time_ms = response_time * 1000
+            output_tokens = len(response["choices"][0]["message"]["content"].split()) * 1.3
+            
+            analytics.record_request(
+                model_id=model_id,
+                request_tokens=int(input_tokens),
+                response_tokens=int(output_tokens),
+                response_time_ms=response_time_ms,
+                success=True
+            )
+            
             return response
             
         except Exception as e:
@@ -222,6 +242,17 @@ class ModelManager:
             self.error_count += 1
             response_time = time.time() - start_time
             self._update_model_metrics(model_id, response_time, success=False)
+            
+            # Record error analytics
+            response_time_ms = response_time * 1000
+            analytics.record_request(
+                model_id=model_id,
+                request_tokens=int(input_tokens),
+                response_tokens=0,
+                response_time_ms=response_time_ms,
+                success=False,
+                error_message=str(e)
+            )
             
             logger.error(f"Error in get_response for {model_id}: {e}")
             raise

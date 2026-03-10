@@ -789,8 +789,218 @@ def hf_compare(model_ids: List[str] = typer.Argument(..., help="Model IDs to com
         console.print(f"[red]❌ Comparison failed: {e}[/red]")
         raise typer.Exit(1)
 
+@hf_app.command("batch-download")
+def hf_batch_download(model_ids: List[str] = typer.Argument(..., help="Model IDs to download"), 
+                    force: bool = typer.Option(False, "--force", "-f", help="Force download even if model exists"),
+                    add_to_config: bool = typer.Option(True, "--add-to-config/--no-add-to-config", help="Add to Heidi configuration")):
+    """Download multiple models from HuggingFace."""
+    import asyncio
+    from .integrations.huggingface import get_huggingface_integration
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    import time
+    
+    console.print(f"[bold blue]⬇️  Batch downloading {len(model_ids)} models:[/bold blue]")
+    for i, model_id in enumerate(model_ids, 1):
+        console.print(f"  {i}. {model_id}")
+    console.print()
+    
+    if force:
+        console.print("[yellow]Force download enabled - will overwrite existing files[/yellow]")
+    
+    start_time = time.time()
+    results = []
+    
+    def download_single_model(model_id):
+        """Download a single model."""
+        try:
+            hf = get_huggingface_integration()
+            metadata = asyncio.run(hf.download_model(model_id, force))
+            
+            config = None
+            if add_to_config:
+                config = asyncio.run(hf.auto_configure_model(model_id, Path(metadata['local_path'])))
+            
+            return {
+                "model_id": model_id,
+                "success": True,
+                "metadata": metadata,
+                "config": config,
+                "error": None
+            }
+        except Exception as e:
+            return {
+                "model_id": model_id,
+                "success": False,
+                "metadata": None,
+                "config": None,
+                "error": str(e)
+            }
+    
+    # Download models in parallel (limit to 3 concurrent downloads)
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        future_to_model = {executor.submit(download_single_model, model_id): model_id 
+                         for model_id in model_ids}
+        
+        for future in as_completed(future_to_model):
+            model_id = future_to_model[future]
+            try:
+                result = future.result()
+                results.append(result)
+                
+                if result["success"]:
+                    console.print(f"✅ {model_id}: Downloaded ({result['metadata']['size_gb']} GB)")
+                else:
+                    console.print(f"❌ {model_id}: {result['error']}")
+            except Exception as e:
+                console.print(f"❌ {model_id}: Unexpected error: {e}")
+    
+    # Add successful models to configuration
+    if add_to_config:
+        successful_configs = [r["config"] for r in results if r["success"] and r["config"]]
+        if successful_configs:
+            from .shared.config import ConfigLoader
+            suite_config = ConfigLoader.load()
+            
+            for config in successful_configs:
+                existing_ids = [m.id for m in suite_config.models]
+                if config['id'] not in existing_ids:
+                    suite_config.models.append(config)
+            
+            # Save configuration
+            config_path = suite_config.data_root / "config" / "suite.json"
+            import json
+            with open(config_path, "w") as f:
+                json.dump(suite_config.model_dump(mode='json'), f, indent=2)
+            
+            console.print(f"✅ Added {len(successful_configs)} models to Heidi configuration")
+    
+    # Summary
+    total_time = time.time() - start_time
+    successful = sum(1 for r in results if r["success"])
+    failed = len(results) - successful
+    total_size = sum(r["metadata"]["size_gb"] for r in results if r["success"] and r["metadata"])
+    
+    console.print(f"\n[bold green]📊 Batch Download Summary:[/bold green]")
+    console.print(f"✅ Successful: {successful}")
+    console.print(f"❌ Failed: {failed}")
+    console.print(f"💾 Total Size: {total_size:.2f} GB")
+    console.print(f"⏱️  Total Time: {total_time:.1f}s")
+    
+    if failed > 0:
+        console.print(f"\n[bold red]Failed downloads:[/bold red]")
+        for result in results:
+            if not result["success"]:
+                console.print(f"  • {result['model_id']}: {result['error']}")
+        
+        raise typer.Exit(1)
+
+@hf_app.command("analytics")
+def hf_analytics(model_id: Optional[str] = typer.Argument(None, help="Model ID to analyze (optional)"),
+                 days: int = typer.Option(30, "--days", "-d", help="Number of days to analyze"),
+                 export: bool = typer.Option(False, "--export", "-e", help="Export analytics to JSON")):
+    """Show usage analytics for models."""
+    from .integrations.analytics import get_analytics
+    from rich.console import Console
+    from rich.table import Table
+    from rich.panel import Panel
+    import json
+    
+    console = Console()
+    analytics = get_analytics()
+    
+    if model_id:
+        # Show analytics for specific model
+        console.print(f"[bold blue]📊 Analytics for {model_id} (last {days} days):[/bold blue]\n")
+        
+        usage = analytics.get_model_usage(model_id, days)
+        performance = analytics.get_performance_metrics(model_id, days)
+        trends = analytics.get_usage_trends(model_id, days)
+        
+        if usage:
+            # Usage table
+            usage_table = Table(title="Usage Summary")
+            usage_table.add_column("Metric", style="cyan")
+            usage_table.add_column("Value", style="green")
+            
+            usage_table.add_row("Total Requests", f"{usage.request_count:,}")
+            usage_table.add_row("Total Tokens", f"{usage.total_tokens:,}")
+            usage_table.add_row("Avg Response Time", f"{usage.avg_response_time:.2f}ms")
+            usage_table.add_row("Success Rate", f"{usage.success_rate:.1%}")
+            usage_table.add_row("Error Count", f"{usage.error_count}")
+            usage_table.add_row("Last Used", usage.last_used.strftime("%Y-%m-%d %H:%M"))
+            
+            console.print(usage_table)
+            
+            if performance:
+                # Performance table
+                perf_table = Table(title="Performance Metrics")
+                perf_table.add_column("Metric", style="cyan")
+                perf_table.add_column("Value", style="green")
+                
+                perf_table.add_row("Avg Latency", f"{performance.avg_latency_ms:.2f}ms")
+                perf_table.add_row("P95 Latency", f"{performance.p95_latency_ms:.2f}ms")
+                perf_table.add_row("P99 Latency", f"{performance.p99_latency_ms:.2f}ms")
+                perf_table.add_row("Throughput", f"{performance.throughput_requests_per_min:.1f} req/min")
+                perf_table.add_row("Error Rate", f"{performance.error_rate:.1%}")
+                perf_table.add_row("Token Efficiency", f"{performance.token_efficiency:.1f} tokens/sec")
+                
+                console.print(perf_table)
+            
+            if export:
+                export_data = analytics.export_analytics(model_id, days)
+                export_file = Path.home() / ".heidi" / f"analytics_{model_id.replace('/', '_')}.json"
+                export_file.parent.mkdir(parents=True, exist_ok=True)
+                
+                with open(export_file, "w") as f:
+                    json.dump(export_data, f, indent=2, default=str)
+                
+                console.print(f"\n✅ Analytics exported to: {export_file}")
+        else:
+            console.print(f"[yellow]No usage data found for {model_id}[/yellow]")
+    
+    else:
+        # Show top models
+        console.print(f"[bold blue]📊 Top Models (last {days} days):[/bold blue]\n")
+        
+        top_models = analytics.get_top_models(limit=10, days=days)
+        
+        if top_models:
+            table = Table(title="Top Models by Usage")
+            table.add_column("Rank", style="cyan", no_wrap=True)
+            table.add_column("Model", style="green")
+            table.add_column("Requests", justify="right")
+            table.add_column("Tokens", justify="right")
+            table.add_column("Avg Time", justify="right")
+            table.add_column("Success Rate", justify="right")
+            
+            for i, model in enumerate(top_models, 1):
+                table.add_row(
+                    str(i),
+                    model.model_id,
+                    f"{model.request_count:,}",
+                    f"{model.total_tokens:,}",
+                    f"{model.avg_response_time:.1f}ms",
+                    f"{model.success_rate:.1%}"
+                )
+            
+            console.print(table)
+            
+            if export:
+                export_data = analytics.export_analytics(days=days)
+                export_file = Path.home() / ".heidi" / "analytics_all_models.json"
+                export_file.parent.mkdir(parents=True, exist_ok=True)
+                
+                with open(export_file, "w") as f:
+                    json.dump(export_data, f, indent=2, default=str)
+                
+                console.print(f"\n✅ Analytics exported to: {export_file}")
+        else:
+            console.print("[yellow]No usage data found[/yellow]")
+            console.print("Models need to be used via API to generate analytics data.")
+
 @hf_app.command("remove")
 def hf_remove(model_id: str):
+    """Remove a locally downloaded HuggingFace model."""
     from .integrations.huggingface import get_huggingface_integration
     
     console.print(f"[bold red]🗑️  Removing model: {model_id}[/bold red]")
