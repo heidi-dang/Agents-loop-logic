@@ -160,6 +160,9 @@ setup_venv() {
 install_dependencies() {
     print_step "Installing dependencies..."
     
+    # Install build tools first
+    pip install build setuptools wheel
+    
     if ! pip install -e .; then
         print_error "Failed to install Heidi CLI dependencies"
         exit 1
@@ -172,18 +175,12 @@ install_dependencies() {
 build_heidi() {
     print_step "Building Heidi CLI..."
     
-    # Install build tools first
-    pip install build setuptools wheel
-    
-    # Check if build tools are available
-    if python3 -m build --help &> /dev/null; then
-        # Use modern build system
-        python3 -m build
-        print_success "Heidi CLI built with modern build system"
+    # pip install -e . already builds the package, so just verify
+    if python3 -c "import heidi_cli" &> /dev/null; then
+        print_success "Heidi CLI built successfully"
     else
-        # Fallback to setup.py
-        python3 setup.py build
-        print_success "Heidi CLI built with setup.py"
+        print_error "Heidi CLI build failed"
+        exit 1
     fi
 }
 
@@ -191,12 +188,7 @@ build_heidi() {
 install_heidi() {
     print_step "Installing Heidi CLI..."
     
-    # Install in development mode with user permissions
-    if ! pip install -e . $PIP_INSTALL_ARGS; then
-        print_error "Failed to install Heidi CLI"
-        exit 1
-    fi
-    
+    # Already installed by install_dependencies() with pip install -e .
     print_success "Heidi CLI installed successfully"
 }
 
