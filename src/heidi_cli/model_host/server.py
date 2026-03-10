@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, AsyncGenerator, Dict, Any
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from .manager import manager
 from ..shared.config import ConfigLoader
 from ..token_tracking.models import get_token_database
@@ -26,6 +28,12 @@ class ChatCompletionRequest(BaseModel):
     stream: bool = False
     temperature: Optional[float] = 1.0
     max_tokens: Optional[int] = None
+<<<<<<< HEAD
+    stop: Optional[List[str]] = None
+    top_p: Optional[float] = 1.0
+    frequency_penalty: Optional[float] = 0.0
+    presence_penalty: Optional[float] = 0.0
+=======
     top_p: Optional[float] = None
     top_k: Optional[int] = None
     session_id: Optional[str] = None
@@ -40,10 +48,46 @@ class TokenUsageRequest(BaseModel):
     model_id: Optional[str] = None
     days: Optional[int] = None
     limit: Optional[int] = 100
+>>>>>>> origin/main
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    """Enhanced health check with detailed status."""
+    try:
+        models = manager.list_models()
+        available_models = [m for m in models if m.get("status") == "available"]
+        loading_models = [m for m in models if m.get("status") == "loading"]
+        error_models = [m for m in models if m.get("status") == "error"]
+        
+        return {
+            "status": "healthy",
+            "version": "0.1.1",
+            "uptime_seconds": manager.uptime,
+            "models": {
+                "total": len(models),
+                "available": len(available_models),
+                "loading": len(loading_models),
+                "error": len(error_models)
+            },
+            "requests": {
+                "total": manager.metrics["total_requests"],
+                "avg_latency_ms": manager.metrics["avg_latency_ms"],
+                "error_rate": manager.metrics["error_rate"]
+            },
+            "services": {
+                "opencode_api": manager.opencode_client is not None,
+                "local_models": manager.model is not None,
+                "registry": True  # Registry is always available
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
 
 @app.get("/v1/status")
 async def get_status():
@@ -58,7 +102,7 @@ async def get_status():
 
 @app.get("/v1/models")
 async def list_models():
-    """OpenAI-compatible models endpoint."""
+    """OpenAI-compatible models endpoint with enhanced metadata."""
     try:
         models = manager.list_models()
         return {"object": "list", "data": models}
@@ -66,6 +110,23 @@ async def list_models():
         logger.error(f"Error listing models: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+<<<<<<< HEAD
+@app.get("/v1/models/{model_id}")
+async def get_model(model_id: str):
+    """Get detailed information about a specific model."""
+    try:
+        models = manager.list_models()
+        model = next((m for m in models if m["id"] == model_id), None)
+        
+        if not model:
+            raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
+        
+        return model
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting model {model_id}: {e}")
+=======
 @app.post("/v1/model/unload")
 async def unload_model(request: ModelUnloadRequest):
     """Unload the currently loaded model."""
@@ -189,12 +250,33 @@ async def get_token_stats(
         }
     except Exception as e:
         logging.error(f"Error getting token stats: {e}")
+>>>>>>> origin/main
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest, http_request: Request):
     """OpenAI-compatible completions endpoint."""
     try:
+<<<<<<< HEAD
+        if request.stream:
+            return StreamingResponse(
+                stream_chat_completion(request),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+            )
+        else:
+            response = await manager.get_response(
+                model_id=request.model,
+                messages=[m.model_dump() for m in request.messages],
+                temperature=request.temperature,
+                max_tokens=request.max_tokens,
+                stop=request.stop,
+                top_p=request.top_p,
+                frequency_penalty=request.frequency_penalty,
+                presence_penalty=request.presence_penalty
+            )
+            return response
+=======
         # Extract generation parameters
         kwargs = {}
         if request.temperature is not None:
@@ -217,6 +299,7 @@ async def chat_completions(request: ChatCompletionRequest, http_request: Request
             **kwargs
         )
         return response
+>>>>>>> origin/main
     except ValueError as e:
         logger.warning(f"Invalid model requested: {e}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -226,6 +309,31 @@ async def chat_completions(request: ChatCompletionRequest, http_request: Request
     except Exception:
         logger.exception("Unexpected error in chat_completions")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+async def stream_chat_completion(request: ChatCompletionRequest) -> AsyncGenerator[str, None]:
+    """Stream chat completion response."""
+    try:
+        async for chunk in manager.stream_response(
+            model_id=request.model,
+            messages=[m.model_dump() for m in request.messages],
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+            stop=request.stop,
+            top_p=request.top_p,
+            frequency_penalty=request.frequency_penalty,
+            presence_penalty=request.presence_penalty
+        ):
+            yield f"data: {chunk}\n\n"
+        yield "data: [DONE]\n\n"
+    except Exception as e:
+        logger.error(f"Streaming error: {e}")
+        error_chunk = {
+            "error": {
+                "message": str(e),
+                "type": "internal_error"
+            }
+        }
+        yield f"data: {json.dumps(error_chunk)}\n\n"
 
 @app.on_event("startup")
 async def startup_event():
