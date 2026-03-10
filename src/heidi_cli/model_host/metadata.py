@@ -59,6 +59,7 @@ class ModelMetadata(BaseModel):
     version: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    extra_data: Dict[str, Any] = {}  # Additional metadata
     
     class Config:
         json_encoders = {
@@ -154,7 +155,7 @@ class MetadataManager:
         self._load_custom_models()
     
     def _load_custom_models(self):
-        """Load custom model metadata from registry"""
+        """Load custom model metadata from registry and HuggingFace."""
         try:
             from ..registry.manager import model_registry
             registry = model_registry.load_registry()
@@ -179,6 +180,72 @@ class MetadataManager:
                 
         except Exception as e:
             # Registry might not be initialized yet
+            pass
+        
+        # Load HuggingFace models
+        try:
+            from ..integrations.huggingface import get_huggingface_integration
+            hf = get_huggingface_integration()
+            local_models = hf.list_local_models()
+            
+            for model in local_models:
+                # Create enhanced metadata for HuggingFace models
+                capabilities = [ModelCapability.CHAT, ModelCapability.STREAMING]
+                
+                # Detect capabilities from model info if available
+                if 'capabilities' in model:
+                    for cap in model['capabilities']:
+                        if cap == 'coding':
+                            capabilities.append(ModelCapability.CODING)
+                        elif cap == 'function_calling':
+                            capabilities.append(ModelCapability.FUNCTION_CALLING)
+                        elif cap == 'vision':
+                            capabilities.append(ModelCapability.VISION)
+                        elif cap == 'embeddings':
+                            capabilities.append(ModelCapability.EMBEDDINGS)
+                
+                # Determine context length
+                context_length = 4096  # Default
+                if 'max_context' in model:
+                    context_length = model['max_context']
+                elif 'context_length' in model:
+                    context_length = model['context_length']
+                
+                metadata = ModelMetadata(
+                    id=model['safe_id'],
+                    display_name=model.get('model_id', model['safe_id']),
+                    description=model.get('description', f"HuggingFace model: {model.get('model_id', model['safe_id'])}"),
+                    provider=ModelProvider.LOCAL,
+                    capabilities=capabilities,
+                    context_length=context_length,
+                    max_output_tokens=min(context_length // 2, 2048),
+                    status=ModelStatus.AVAILABLE,
+                    tags=model.get('tags', []) + ["huggingface", "downloaded"],
+                    version=model.get('version', '1.0'),
+                    created_at=datetime.fromisoformat(model.get('downloaded_at', datetime.now().isoformat())),
+                    updated_at=datetime.now()
+                )
+                
+                # Add additional metadata fields
+                metadata.extra_data = {
+                    'original_id': model.get('model_id', model['safe_id']),
+                    'author': model.get('author', 'Unknown'),
+                    'downloads': model.get('downloads', 0),
+                    'likes': model.get('likes', 0),
+                    'pipeline_tag': model.get('pipeline_tag', 'text-generation'),
+                    'model_type': model.get('model_type'),
+                    'languages': model.get('languages', []),
+                    'license': model.get('license'),
+                    'model_family': model.get('model_family'),
+                    'architecture': model.get('architecture'),
+                    'size_gb': model.get('size_gb', 0.0),
+                    'file_count': model.get('file_count', 0)
+                }
+                
+                self.custom_models[model['safe_id']] = metadata
+                
+        except Exception as e:
+            # HuggingFace might not be available
             pass
     
     def get_metadata(self, model_id: str) -> Optional[ModelMetadata]:

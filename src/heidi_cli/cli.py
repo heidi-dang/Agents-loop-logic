@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typer
 import sys
-from typing import Optional
+from typing import List, Optional
 from rich.console import Console
 
 from .shared.config import ConfigLoader
@@ -18,10 +18,12 @@ app = typer.Typer(
 model_app = typer.Typer(help="Local model management (serve/status/stop/reload)")
 memory_app = typer.Typer(help="Memory management (status/search)")
 learning_app = typer.Typer(help="Learning & Training management (reflect/export/curate/train-full/eval/promote/rollback)")
+hf_app = typer.Typer(help="HuggingFace model management")
 
 app.add_typer(model_app, name="model")
 app.add_typer(memory_app, name="memory")
 app.add_typer(learning_app, name="learning")
+app.add_typer(hf_app, name="hf")
 
 @app.command()
 def doctor():
@@ -486,6 +488,351 @@ def model_reload():
         console.print("[green]✓ Hot-swap complete. Serving new state.[/green]")
     else:
         console.print("[red]Hot-swap failed. See logs.[/red]")
+
+# HuggingFace Commands
+@hf_app.command("search")
+def hf_search(query: str, task: str = "text-generation", limit: int = 20):
+    """Search models on HuggingFace Hub."""
+    import asyncio
+    from .integrations.huggingface import get_huggingface_integration
+    
+    console.print(f"[bold blue]🔍 Searching HuggingFace for: {query}[/bold blue]")
+    console.print(f"Task filter: {task}, Limit: {limit}\n")
+    
+    try:
+        models = asyncio.run(get_huggingface_integration().search_models(query, task, limit))
+        
+        if not models:
+            console.print("No models found.")
+            return
+        
+        console.print(f"[bold]Found {len(models)} models:[/bold]\n")
+        
+        for i, model in enumerate(models[:limit], 1):
+            console.print(f"{i}. 📦 {model['id']}")
+            console.print(f"   👤 {model['author']} | ⬇️ {model['downloads']:,} downloads | ❤️ {model['likes']}")
+            if model.get('tags'):
+                tags = model['tags'][:5]  # Show first 5 tags
+                console.print(f"   🏷️  {', '.join(tags)}")
+            console.print()
+            
+    except Exception as e:
+        console.print(f"[red]❌ Search failed: {e}[/red]")
+        raise typer.Exit(1)
+
+@hf_app.command("info")
+def hf_info(model_id: str):
+    """Get detailed information about a HuggingFace model."""
+    import asyncio
+    from .integrations.huggingface import get_huggingface_integration
+    
+    console.print(f"[bold blue]📋 Model Info: {model_id}[/bold blue]\n")
+    
+    try:
+        info = asyncio.run(get_huggingface_integration().get_model_info(model_id))
+        
+        console.print(f"[bold]Author:[/bold] {info.get('author', 'Unknown')}")
+        console.print(f"[bold]Downloads:[/bold] {info.get('downloads', 0):,}")
+        console.print(f"[bold]Likes:[/bold] {info.get('likes', 0):,}")
+        console.print(f"[bold]Pipeline:[/bold] {info.get('pipeline_tag', 'Unknown')}")
+        
+        capabilities = info.get('capabilities', [])
+        if capabilities:
+            console.print(f"[bold]Capabilities:[/bold] {', '.join(capabilities)}")
+        
+        context_length = info.get('context_length')
+        if context_length:
+            console.print(f"[bold]Context Length:[/bold] {context_length:,} tokens")
+        
+        tags = info.get('tags', [])
+        if tags:
+            console.print(f"[bold]Tags:[/bold] {', '.join(tags[:10])}")
+        
+        description = info.get('description', '')
+        if description:
+            console.print(f"\n[bold]Description:[/bold]")
+            console.print(description[:500] + "..." if len(description) > 500 else description)
+        
+    except Exception as e:
+        console.print(f"[red]❌ Failed to get model info: {e}[/red]")
+        raise typer.Exit(1)
+
+@hf_app.command("download")
+def hf_download(model_id: str, force: bool = False, add_to_config: bool = True):
+    """Download a model from HuggingFace and add to Heidi configuration."""
+    import asyncio
+    from .integrations.huggingface import get_huggingface_integration
+    from .shared.config import ConfigLoader
+    from pathlib import Path
+    
+    console.print(f"[bold blue]⬇️  Downloading model: {model_id}[/bold blue]")
+    
+    if force:
+        console.print("[yellow]Force download enabled - will overwrite existing files[/yellow]")
+    
+    try:
+        metadata = asyncio.run(get_huggingface_integration().download_model(model_id, force))
+        
+        console.print(f"✅ Downloaded to: {metadata['local_path']}")
+        console.print(f"📁 Files: {metadata['file_count']}")
+        console.print(f"💾 Size: {metadata['size_gb']} GB")
+        
+        if add_to_config:
+            console.print("\n[bold]Adding to Heidi configuration...[/bold]")
+            
+            # Auto-configure model
+            config = asyncio.run(get_huggingface_integration().auto_configure_model(
+                model_id, Path(metadata['local_path'])
+            ))
+            
+            # Add to Heidi configuration
+            suite_config = ConfigLoader.load()
+            
+            # Check if model already exists
+            existing_ids = [m.id for m in suite_config.models]
+            if config['id'] in existing_ids:
+                console.print(f"[yellow]Model {config['id']} already exists in configuration[/yellow]")
+                if not console.input("Overwrite existing configuration? (y/n): ").lower().startswith('y'):
+                    console.print("Skipping configuration update.")
+                    config = None
+            
+            if config:
+                suite_config.models.append(config)
+                
+                # Save configuration
+                config_path = suite_config.data_root / "config" / "suite.json"
+                config_path.parent.mkdir(parents=True, exist_ok=True)
+                import json
+                with open(config_path, "w") as f:
+                    json.dump(suite_config.model_dump(mode='json'), f, indent=2)
+                
+                console.print(f"✅ Added to Heidi configuration as: {config['id']}")
+                console.print(f"   Capabilities: {', '.join(config['capabilities'])}")
+                console.print(f"   Context length: {config['max_context']:,} tokens")
+        
+        console.print(f"\n[bold green]🎉 Model ready![/bold green]")
+        console.print(f"Start the model host with: [bold]heidi model serve[/bold]")
+        console.print(f"Then use with:")
+        console.print(f"curl -X POST http://127.0.0.1:8000/v1/chat/completions \\")
+        console.print(f"  -H 'Content-Type: application/json' \\")
+        console.print(f"  -d '{{\"model\": \"{config['id'] if add_to_config else model_id}\", \"messages\": [{{\"role\": \"user\", \"content\": \"Hello!\"}}]}}'")
+        
+    except Exception as e:
+        console.print(f"[red]❌ Download failed: {e}[/red]")
+        raise typer.Exit(1)
+
+@hf_app.command("list-local")
+def hf_list_local():
+    """List downloaded HuggingFace models."""
+    from .integrations.huggingface import get_huggingface_integration
+    
+    local_models = get_huggingface_integration().list_local_models()
+    
+    if not local_models:
+        console.print("No HuggingFace models downloaded yet.")
+        console.print("Use 'heidi hf download <model_id>' to download models.")
+        return
+    
+    console.print(f"Downloaded HuggingFace Models ({len(local_models)}):")
+    console.print()
+    
+    for i, model in enumerate(local_models, 1):
+        console.print(f"{i}. Model: {model['model_id']}")
+        console.print(f"   Path: {model['local_path']}")
+        console.print(f"   Size: {model['size_gb']} GB")
+        console.print(f"   Files: {model['file_count']}")
+        console.print(f"   Downloaded: {model['downloaded_at']}")
+        
+        # Show if it's configured in Heidi
+        from .shared.config import ConfigLoader
+        suite_config = ConfigLoader.load()
+        configured_ids = [m.id for m in suite_config.models]
+        safe_id = model['model_id'].replace("/", "_").replace("\\", "_")
+        
+        if safe_id in configured_ids:
+            console.print(f"   Status: Configured in Heidi")
+        else:
+            console.print(f"   Status: Not configured in Heidi")
+        
+        console.print()
+
+@hf_app.command("compare")
+def hf_compare(model_ids: List[str] = typer.Argument(..., help="Model IDs to compare")):
+    """Compare multiple HuggingFace models."""
+    import asyncio
+    from .integrations.huggingface import get_huggingface_integration
+    from rich.console import Console
+    from rich.table import Table
+    from rich.panel import Panel
+    
+    console = Console()
+    
+    if len(model_ids) < 2:
+        console.print("[red]❌ Please provide at least 2 models to compare[/red]")
+        raise typer.Exit(1)
+    
+    console.print(f"[bold blue]📊 Comparing {len(model_ids)} models:[/bold blue] {', '.join(model_ids)}\n")
+    
+    try:
+        hf = get_huggingface_integration()
+        
+        # Get model info for all models
+        models_info = []
+        for model_id in model_ids:
+            try:
+                info = asyncio.run(hf.get_model_info(model_id))
+                models_info.append(info)
+            except Exception as e:
+                console.print(f"[yellow]⚠️  Could not fetch info for {model_id}: {e}[/yellow]")
+        
+        if len(models_info) < 2:
+            console.print("[red]❌ Not enough valid models to compare[/red]")
+            raise typer.Exit(1)
+        
+        # Create comparison table
+        table = Table(title="Model Comparison")
+        table.add_column("Feature", style="cyan", no_wrap=True)
+        
+        for model in models_info:
+            display_name = model.get('id', 'Unknown')
+            if len(display_name) > 15:
+                display_name = display_name[:12] + "..."
+            table.add_column(display_name, style="green")
+        
+        # Basic info
+        table.add_row("Author", *[model.get('author', 'Unknown') for model in models_info])
+        table.add_row("Downloads", *[f"{model.get('downloads', 0):,}" for model in models_info])
+        table.add_row("Likes", *[f"{model.get('likes', 0):,}" for model in models_info])
+        table.add_row("Pipeline", *[model.get('pipeline_tag', 'Unknown') for model in models_info])
+        
+        # Capabilities
+        capabilities = []
+        for model in models_info:
+            caps = []
+            tags = model.get('tags', [])
+            if any(tag in tags for tag in ['chat', 'instruct']):
+                caps.append('💬')
+            if any(tag in tags for tag in ['coding', 'code']):
+                caps.append('💻')
+            if any(tag in tags for tag in ['vision', 'image']):
+                caps.append('👁️')
+            if any(tag in tags for tag in ['function-calling', 'tool']):
+                caps.append('🔧')
+            capabilities.append(' '.join(caps) if caps else '💬')
+        
+        table.add_row("Capabilities", *capabilities)
+        
+        # Model size
+        model_sizes = []
+        for model in models_info:
+            tags = model.get('tags', [])
+            size = 'Unknown'
+            for tag in ['70b', '30b', '13b', '7b', '3b', '1.8b', '1b']:
+                if tag in tags:
+                    size = tag.upper()
+                    break
+            model_sizes.append(size)
+        table.add_row("Size", *model_sizes)
+        
+        # Languages
+        languages = []
+        for model in models_info:
+            tags = model.get('tags', [])
+            langs = [tag for tag in tags if tag in ['english', 'chinese', 'french', 'german', 'spanish']]
+            languages.append(', '.join(langs) if langs else 'English')
+        table.add_row("Languages", *languages)
+        
+        # License
+        licenses = []
+        for model in models_info:
+            tags = model.get('tags', [])
+            license_info = 'Unknown'
+            for tag in tags:
+                if tag.startswith('license:'):
+                    license_info = tag.split(':', 1)[1]
+                    break
+            licenses.append(license_info)
+        table.add_row("License", *licenses)
+        
+        console.print(table)
+        
+        # Recommendations
+        console.print("\n[bold yellow]🎯 Recommendations:[/bold yellow]")
+        
+        # Best for downloads
+        best_downloads = max(models_info, key=lambda x: x.get('downloads', 0))
+        console.print(f"• Most Popular: {best_downloads.get('id')} ({best_downloads.get('downloads', 0):,} downloads)")
+        
+        # Best for likes
+        best_likes = max(models_info, key=lambda x: x.get('likes', 0))
+        console.print(f"• Most Liked: {best_likes.get('id')} ({best_likes.get('likes', 0):,} likes)")
+        
+        # Best for coding
+        coding_models = [m for m in models_info if any(tag in m.get('tags', []) for tag in ['coding', 'code'])]
+        if coding_models:
+            console.print(f"• Best for Coding: {', '.join([m.get('id') for m in coding_models])}")
+        
+        # Smallest model
+        size_order = ['1b', '1.8b', '3b', '7b', '13b', '30b', '70b']
+        smallest = None
+        for model in models_info:
+            tags = model.get('tags', [])
+            for size in size_order:
+                if size in tags:
+                    if smallest is None or size_order.index(size) < size_order.index(smallest[1]):
+                        smallest = (model.get('id'), size)
+                    break
+        if smallest:
+            console.print(f"• Smallest Model: {smallest[0]} ({smallest[1].upper()})")
+        
+    except Exception as e:
+        console.print(f"[red]❌ Comparison failed: {e}[/red]")
+        raise typer.Exit(1)
+
+@hf_app.command("remove")
+def hf_remove(model_id: str):
+    from .integrations.huggingface import get_huggingface_integration
+    
+    console.print(f"[bold red]🗑️  Removing model: {model_id}[/bold red]")
+    
+    # Check if model exists locally
+    local_info = get_huggingface_integration().get_local_model_info(model_id)
+    if not local_info:
+        console.print(f"[yellow]Model {model_id} not found in local storage[/yellow]")
+        return
+    
+    console.print(f"Local path: {local_info['local_path']}")
+    console.print(f"Size: {local_info['size_gb']} GB")
+    
+    if not console.input("Are you sure you want to remove this model? (y/n): ").lower().startswith('y'):
+        console.print("Removal cancelled.")
+        return
+    
+    try:
+        success = asyncio.run(get_huggingface_integration().remove_model(model_id))
+        if success:
+            console.print(f"✅ Successfully removed model {model_id}")
+            
+            # Also remove from Heidi configuration if present
+            from .shared.config import ConfigLoader
+            suite_config = ConfigLoader.load()
+            
+            safe_id = model_id.replace("/", "_").replace("\\", "_")
+            suite_config.models = [m for m in suite_config.models if m.id != safe_id]
+            
+            # Save updated configuration
+            config_path = suite_config.data_root / "config" / "suite.json"
+            import json
+            with open(config_path, "w") as f:
+                json.dump(suite_config.model_dump(mode='json'), f, indent=2)
+            
+            console.print(f"✅ Also removed from Heidi configuration")
+        else:
+            console.print(f"[yellow]Failed to remove model {model_id}[/yellow]")
+            
+    except Exception as e:
+        console.print(f"[red]❌ Error removing model: {e}[/red]")
+        raise typer.Exit(1)
 
 if __name__ == "__main__":
     app()

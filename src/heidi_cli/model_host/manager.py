@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional, AsyncGenerator
 from ..shared.config import ConfigLoader, ModelConfig
-from .metadata import metadata_manager, ModelStatus, ModelMetrics
+from .metadata import metadata_manager, ModelStatus, ModelMetrics, ModelProvider
 
 logger = logging.getLogger("heidi.model_host")
 
@@ -166,6 +166,24 @@ class ModelManager:
                     "requests_per_minute": metadata.metrics.requests_per_minute,
                     "success_rate": metadata.metrics.success_rate,
                     "last_updated": metadata.metrics.last_updated.isoformat() if metadata.metrics.last_updated else None
+                }
+            
+            # Add enhanced metadata for HuggingFace models
+            if metadata.provider == ModelProvider.LOCAL and metadata.extra_data:
+                hf_data = metadata.extra_data
+                model_dict["huggingface"] = {
+                    "original_id": hf_data.get("original_id"),
+                    "author": hf_data.get("author"),
+                    "downloads": hf_data.get("downloads"),
+                    "likes": hf_data.get("likes"),
+                    "pipeline_tag": hf_data.get("pipeline_tag"),
+                    "model_type": hf_data.get("model_type"),
+                    "languages": hf_data.get("languages"),
+                    "license": hf_data.get("license"),
+                    "model_family": hf_data.get("model_family"),
+                    "architecture": hf_data.get("architecture"),
+                    "size_gb": hf_data.get("size_gb"),
+                    "file_count": hf_data.get("file_count")
                 }
             
             models.append(model_dict)
