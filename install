@@ -172,8 +172,11 @@ install_dependencies() {
 build_heidi() {
     print_step "Building Heidi CLI..."
     
+    # Install build tools first
+    pip install build setuptools wheel
+    
     # Check if build tools are available
-    if command -v python3 -m build &> /dev/null; then
+    if python3 -m build --help &> /dev/null; then
         # Use modern build system
         python3 -m build
         print_success "Heidi CLI built with modern build system"
@@ -217,7 +220,37 @@ verify_installation() {
         fi
     else
         print_error "heidi command not found after installation"
-        print_info "Try running: export PATH=\"$HOME/.local/bin:\$PATH\""
+        print_info "Trying to locate heidi command..."
+        
+        # Try to find heidi in common locations
+        HEIDI_LOCATIONS=(
+            "$HOME/.local/bin/heidi"
+            "/usr/local/bin/heidi"
+            "$HOME/bin/heidi"
+            "/usr/bin/heidi"
+        )
+        
+        for location in "${HEIDI_LOCATIONS[@]}"; do
+            if [[ -f "$location" ]]; then
+                print_success "Found heidi at: $location"
+                print_info "Adding $location to PATH for current session"
+                export PATH="$PATH:$(dirname $location)"
+                
+                # Test it
+                if "$location" --version &> /dev/null; then
+                    VERSION=$("$location" --version 2>/dev/null || echo "unknown")
+                    print_success "Heidi CLI version: $VERSION"
+                    print_info "To make heidi available permanently, add $(dirname $location) to your PATH"
+                    print_info "Run: echo 'export PATH=\"\$(dirname $location):\$PATH\"' >> ~/.bashrc"
+                    return 0
+                fi
+            fi
+        done
+        
+        print_error "heidi command not found. You may need to:"
+        print_info "1. Restart your terminal"
+        print_info "2. Or run: export PATH=\"\$HOME/.local/bin:\$PATH\""
+        print_info "3. Or run: source ~/.bashrc"
         exit 1
     fi
 }

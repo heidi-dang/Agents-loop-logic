@@ -179,6 +179,9 @@ function Build-Heidi {
     Write-Step "Building Heidi CLI..."
     
     try {
+        # Install build tools first
+        & pip install build setuptools wheel
+        
         # Check if build tools are available
         if (Get-Command "python -m build" -ErrorAction SilentlyContinue) {
             & python -m build
@@ -238,7 +241,41 @@ function Test-Installation {
     }
     catch {
         Write-Error "heidi command not found after installation"
-        Write-Info "You may need to restart your terminal or add Python Scripts to PATH"
+        Write-Info "Trying to locate heidi command..."
+        
+        # Try to find heidi in common locations
+        $heidiLocations = @(
+            "$env:USERPROFILE\.local\bin\heidi.exe",
+            "$env:USERPROFILE\AppData\Local\Programs\Python\Scripts\heidi.exe",
+            "$env:LOCALAPPDATA\Programs\Python\Scripts\heidi.exe",
+            "C:\Python\Scripts\heidi.exe",
+            "C:\Python3\Scripts\heidi.exe"
+        )
+        
+        foreach ($location in $heidiLocations) {
+            if (Test-Path $location) {
+                Write-Success "Found heidi at: $location"
+                Write-Info "Adding $location to PATH for current session"
+                $env:PATH = "$env:PATH;$(Split-Path $location -Parent)"
+                
+                # Test it
+                try {
+                    & $location --version >$null 2>&1
+                    $version = & $location --version 2>$null
+                    Write-Success "Heidi CLI version: $version"
+                    Write-Info "To make heidi available permanently, add $(Split-Path $location -Parent) to your PATH"
+                    return
+                }
+                catch {
+                    Write-Warning "Found heidi but it doesn't work properly"
+                }
+            }
+        }
+        
+        Write-Error "heidi command not found. You may need to:"
+        Write-Info "1. Restart your PowerShell terminal"
+        Write-Info "2. Or run: `$env:PATH = `$env:USERPROFILE\.local\bin;`$env:PATH"
+        Write-Info "3. Or add Python Scripts to your PATH manually"
         exit 1
     }
 }
