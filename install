@@ -139,6 +139,53 @@ clone_heidi() {
     print_info "Installing commit: $COMMIT_HASH ($COMMIT_DATE)"
 }
 
+# Check existing dependencies
+check_existing_dependencies() {
+    print_step "Checking for existing dependencies..."
+    
+    local deps_to_check=(
+        "torch"
+        "transformers"
+        "fastapi"
+        "typer"
+        "rich"
+        "huggingface_hub"
+        "pydantic"
+        "httpx"
+        "uvicorn"
+    )
+    
+    local missing_deps=()
+    local existing_deps=()
+    
+    for dep in "${deps_to_check[@]}"; do
+        if python3 -c "import $dep" &> /dev/null; then
+            existing_deps+=("$dep")
+        else
+            missing_deps+=("$dep")
+        fi
+    done
+    
+    if [ ${#existing_deps[@]} -gt 0 ]; then
+        print_success "Found ${#existing_deps[@]} existing dependencies:"
+        for dep in "${existing_deps[@]}"; do
+            print_info "  ✅ $dep"
+        done
+    fi
+    
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        print_info "Need to install ${#missing_deps[@]} dependencies:"
+        for dep in "${missing_deps[@]}"; do
+            print_info "  ❌ $dep"
+        done
+    else
+        print_success "All major dependencies already installed!"
+        return 0
+    fi
+    
+    return 1
+}
+
 # Setup virtual environment
 setup_venv() {
     print_step "Setting up virtual environment..."
@@ -160,12 +207,38 @@ setup_venv() {
 install_dependencies() {
     print_step "Installing dependencies..."
     
+    # Check if we can skip major dependencies
+    if check_existing_dependencies; then
+        print_info "Skipping major dependency installation - already available"
+        INSTALL_MODE="minimal"
+    else
+        print_info "Installing all dependencies"
+        INSTALL_MODE="full"
+    fi
+    
     # Install build tools first
     pip install build setuptools wheel
     
-    if ! pip install -e .; then
-        print_error "Failed to install Heidi CLI dependencies"
-        exit 1
+    if [ "$INSTALL_MODE" = "minimal" ]; then
+        # Only install Heidi CLI and its direct dependencies
+        print_info "Installing Heidi CLI with minimal dependencies..."
+        if ! pip install -e . --no-deps; then
+            print_warning "Minimal install failed, trying full install..."
+            if ! pip install -e .; then
+                print_error "Failed to install Heidi CLI dependencies"
+                exit 1
+            fi
+        fi
+        
+        # Install essential runtime dependencies only
+        print_info "Installing essential runtime dependencies..."
+        pip install typer rich pydantic
+    else
+        # Full installation
+        if ! pip install -e .; then
+            print_error "Failed to install Heidi CLI dependencies"
+            exit 1
+        fi
     fi
     
     print_success "Dependencies installed"

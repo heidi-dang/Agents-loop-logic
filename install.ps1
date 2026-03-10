@@ -141,6 +141,58 @@ function Invoke-CloneHeidi {
     }
 }
 
+# Check existing dependencies
+function Test-ExistingDependencies {
+    Write-Step "Checking for existing dependencies..."
+    
+    $depsToCheck = @(
+        "torch",
+        "transformers", 
+        "fastapi",
+        "typer",
+        "rich",
+        "huggingface_hub",
+        "pydantic",
+        "httpx",
+        "uvicorn"
+    )
+    
+    $missingDeps = @()
+    $existingDeps = @()
+    
+    foreach ($dep in $depsToCheck) {
+        try {
+            python -c "import $dep" 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                $existingDeps += $dep
+            } else {
+                $missingDeps += $dep
+            }
+        }
+        catch {
+            $missingDeps += $dep
+        }
+    }
+    
+    if ($existingDeps.Count -gt 0) {
+        Write-Success "Found $($existingDeps.Count) existing dependencies:"
+        foreach ($dep in $existingDeps) {
+            Write-Info "  ✅ $dep"
+        }
+    }
+    
+    if ($missingDeps.Count -gt 0) {
+        Write-Info "Need to install $($missingDeps.Count) dependencies:"
+        foreach ($dep in $missingDeps) {
+            Write-Info "  ❌ $dep"
+        }
+        return $false
+    } else {
+        Write-Success "All major dependencies already installed!"
+        return $true
+    }
+}
+
 # Setup virtual environment
 function New-VirtualEnvironment {
     Write-Step "Setting up virtual environment..."
@@ -164,8 +216,40 @@ function New-VirtualEnvironment {
 function Install-Dependencies {
     Write-Step "Installing dependencies..."
     
+    # Check if we can skip major dependencies
+    $skipDeps = Test-ExistingDependencies
+    
+    if ($skipDeps) {
+        Write-Info "Skipping major dependency installation - already available"
+        $installMode = "minimal"
+    } else {
+        Write-Info "Installing all dependencies"
+        $installMode = "full"
+    }
+    
     try {
-        & pip install -e .
+        # Install build tools first
+        & pip install build setuptools wheel
+        
+        if ($installMode -eq "minimal") {
+            # Only install Heidi CLI and its direct dependencies
+            Write-Info "Installing Heidi CLI with minimal dependencies..."
+            try {
+                & pip install -e . --no-deps
+            }
+            catch {
+                Write-Warning "Minimal install failed, trying full install..."
+                & pip install -e .
+            }
+            
+            # Install essential runtime dependencies only
+            Write-Info "Installing essential runtime dependencies..."
+            & pip install typer rich pydantic
+        } else {
+            # Full installation
+            & pip install -e .
+        }
+        
         Write-Success "Dependencies installed"
     }
     catch {
