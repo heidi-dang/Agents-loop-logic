@@ -4,7 +4,8 @@ import os
 import json
 from pathlib import Path
 from typing import Optional, Dict, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
 
 def find_project_root() -> Path:
     """Find the project root by walking up for pyproject.toml."""
@@ -15,12 +16,14 @@ def find_project_root() -> Path:
         current = current.parent
     return Path.cwd().resolve()
 
+
 def get_default_state_root() -> Path:
     """Get the default state root for the learning suite."""
     env_root = os.environ.get("HEIDI_STATE_ROOT")
     if env_root:
         return Path(env_root).expanduser().resolve()
     return find_project_root() / "state"
+
 
 class ModelConfig(BaseModel):
     id: str
@@ -31,10 +34,17 @@ class ModelConfig(BaseModel):
     max_tokens: Optional[int] = None
     max_context: Optional[int] = None
 
+    def model_dump(self, **kwargs):
+        # Convert Path objects to strings for JSON serialization
+        d = super().model_dump(**kwargs)
+        if isinstance(d.get("path"), Path):
+            d["path"] = str(d["path"])
+        return d
+
+
 class SuiteConfig(BaseModel):
     suite_enabled: bool = True
     data_root: Path = Field(default_factory=get_default_state_root)
-    
     model_host_enabled: bool = True
     host: str = "127.0.0.1"
     port: int = 8000
@@ -42,28 +52,30 @@ class SuiteConfig(BaseModel):
     backend_engine: str = "transformers"
     base_model_path: Optional[Path] = None
     request_timeout: int = 60
-    
+    max_memory_gb: int = 32
+    max_concurrent_requests: int = 10
+
     memory_enabled: bool = True
     memory_sqlite_path: Optional[Path] = None
     vector_index_path: Optional[Path] = None
     embedding_model: str = "all-MiniLM-L6-v2"
-    
+
     constitution_enabled: bool = True
     reflection_enabled: bool = True
     reward_enabled: bool = True
     strategy_ranking_enabled: bool = True
-    
+
     event_logging_enabled: bool = True
     dataset_export_enabled: bool = True
-    
+
     full_retraining_enabled: bool = True
     retrain_threshold: float = 0.8
     retrain_schedule: str = "0 0 * * *"
-    
+
     promotion_policy: str = "beat_stable"
     rollback_policy: str = "auto_on_regression"
     retention_policy: str = "keep_last_5"
-    
+
     log_level: str = "info"
 
     @property
@@ -87,12 +99,36 @@ class SuiteConfig(BaseModel):
         for path in self.state_dirs.values():
             path.mkdir(parents=True, exist_ok=True)
 
+    def model_dump(self, **kwargs):
+        # Convert Path objects to strings for JSON serialization
+        d = super().model_dump(**kwargs)
+
+        if isinstance(d.get("data_root"), Path):
+            d["data_root"] = str(d["data_root"])
+
+        if isinstance(d.get("base_model_path"), Path):
+            d["base_model_path"] = str(d["base_model_path"])
+
+        if isinstance(d.get("models"), list):
+            for model in d["models"]:
+                if isinstance(model.get("path"), Path):
+                    model["path"] = str(model["path"])
+
+        if isinstance(d.get("memory_sqlite_path"), Path):
+            d["memory_sqlite_path"] = str(d["memory_sqlite_path"])
+
+        if isinstance(d.get("vector_index_path"), Path):
+            d["vector_index_path"] = str(d["vector_index_path"])
+
+        return d
+
+
 class ConfigLoader:
     @staticmethod
     def load() -> SuiteConfig:
         default_root = get_default_state_root()
         config_path = default_root / "config" / "suite.json"
-        
+
         env_config = os.environ.get("HEIDI_SUITE_CONFIG")
         if env_config:
             config_path = Path(env_config)
@@ -117,7 +153,7 @@ class ConfigLoader:
                     if field == "models":
                         # Special handling for models JSON list via env if needed
                         continue
-                    
+
                     target_type = SuiteConfig.model_fields[field].annotation
                     if target_type is bool:
                         setattr(config, field, env_val.lower() in ("true", "1", "yes"))

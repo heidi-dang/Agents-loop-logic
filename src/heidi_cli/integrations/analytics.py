@@ -50,7 +50,14 @@ class UsageAnalytics:
 
         self.data_root = data_root
         self.db_path = self.data_root / "analytics" / "usage.db"
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        except PermissionError:
+            # Fallback to local state directory if home-based path is not writable
+            logger.warning(f"Permission denied for {self.data_root}, falling back to local state/analytics")
+            self.data_root = Path("state/analytics")
+            self.db_path = self.data_root / "usage.db"
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
         self._lock = threading.Lock()
         self._init_database()

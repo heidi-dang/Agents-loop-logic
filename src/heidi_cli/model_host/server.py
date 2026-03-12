@@ -531,6 +531,10 @@ async def startup_event():
     logger.info(f"Configuration loaded. Serving {len(config.models)} models.")
     for m in config.models:
         logger.info(f" - Model: {m.id} at {m.path}")
+    
+    # Explicitly load model on startup
+    logger.info("Initializing model load...")
+    manager.reload_model()
 
 
 @app.on_event("shutdown")
