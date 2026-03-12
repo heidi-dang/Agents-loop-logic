@@ -128,6 +128,7 @@ async def get_status():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/models")
 @app.get("/v1/models")
 async def list_models():
     """OpenAI-compatible models endpoint with enhanced metadata."""
@@ -276,6 +277,7 @@ async def get_token_stats(days: int = 30, model: Optional[str] = None, user: Opt
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/chat/completions")
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest, http_request: Request):
     """OpenAI-compatible completions endpoint."""

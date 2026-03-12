@@ -586,8 +586,11 @@ class ModelManager:
             inputs = self.tokenizer.apply_chat_template(
                 messages, tokenize=True, return_tensors="pt"
             )
-            logger.info(f"Input shape: {inputs.shape}")
-
+            
+            # Fix: handle both tensor and dict-like inputs
+            input_ids = inputs["input_ids"] if isinstance(inputs, dict) else inputs
+            logger.info(f"Input size: {input_ids.size()}")
+            
             # Move inputs to same device as model
             device = next(self.model.parameters()).device
             logger.info(f"Model device: {device}")
